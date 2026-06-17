@@ -335,7 +335,7 @@ mysql gwos < "${GWOS_DIR}/database/schema.sql"
 # Gera hash correto da senha padrão (o schema.sql tem placeholder)
 ADMIN_HASH=$(php -r "echo password_hash('gwos@2025', PASSWORD_BCRYPT, ['cost' => 12]);" 2>/dev/null || true)
 if [ -n "$ADMIN_HASH" ]; then
-    mysql gwos -e "UPDATE usuarios SET senha='${ADMIN_HASH}' WHERE email='admin@gwos.local';"
+    mysql gwos -e "UPDATE admins SET senha='${ADMIN_HASH}' WHERE email='admin@gwos.local';"
 fi
 
 mysql gwos -e "
