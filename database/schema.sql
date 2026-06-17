@@ -236,10 +236,16 @@ CREATE TABLE horarios (
     FOREIGN KEY (grupo_id) REFERENCES ip_grupos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Seeds: horários de fim de semana
+-- Seeds: horários liberados
+-- dias_semana: 7 bits posição 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sab
+-- Dias úteis (Seg-Sex) = 0111110
 INSERT INTO horarios (nome, grupo_id, dias_semana, hora_inicio, hora_fim, acao) VALUES
-('Livre sábado',  NULL, '0000001', '00:00:00', '23:59:00', 'permitir'),
-('Livre domingo', NULL, '1000000', '00:00:00', '23:59:00', 'permitir');
+('Livre manhã cedo (seg-sex)',  NULL, '0111110', '07:00:00', '08:00:00', 'permitir'),
+('Livre almoço (seg-sex)',      NULL, '0111110', '11:00:00', '13:00:00', 'permitir'),
+('Livre fim de expediente (seg-sex)', NULL, '0111110', '17:00:00', '18:00:00', 'permitir'),
+('Livre noite (seg-sex)',       NULL, '0111110', '19:00:00', '23:00:00', 'permitir'),
+('Livre sábado',                NULL, '0000001', '00:00:00', '23:59:00', 'permitir'),
+('Livre domingo',               NULL, '1000000', '00:00:00', '23:59:00', 'permitir');
 
 -- ------------------------------------------------------------
 -- Configurações de NAT e rede
