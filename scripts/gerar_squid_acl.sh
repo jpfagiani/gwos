@@ -65,13 +65,18 @@ while IFS=$'\t' read -r id dias hora_ini hora_fim acao grupo_id; do
         if [ -n "$src_acl" ]; then
             echo "http_access deny ${src_acl} horario_${id}" >> "$SQUID_ACL"
         else
+            # Bloquear sem grupo: aplica a todos os clientes controlados
+            echo "http_access deny gwos_parciais horario_${id}" >> "$SQUID_ACL"
             echo "http_access deny horario_${id}" >> "$SQUID_ACL"
         fi
     else
         if [ -n "$src_acl" ]; then
             echo "http_access allow ${src_acl} horario_${id}" >> "$SQUID_ACL"
         else
-            echo "http_access allow horario_${id}" >> "$SQUID_ACL"
+            # Permitir sem grupo (ex: Livre sábado/domingo):
+            # desbloqueia blacklist APENAS para parciais — bloqueados e sem
+            # grupo já foram tratados antes do include no squid.conf
+            echo "http_access allow gwos_parciais horario_${id}" >> "$SQUID_ACL"
         fi
     fi
 done
