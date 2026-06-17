@@ -21,10 +21,11 @@ mysql_q() {
 
 IFACE_WAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_wan'")
 IFACE_LAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_lan'")
+REDE_LAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='rede_lan'")
 IP_GATEWAY=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='ip_gateway'")
 NAT_ATIVO=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='nat_ativo'")
 
-echo "[..] Interfaces: WAN=$IFACE_WAN  LAN=$IFACE_LAN  Gateway=$IP_GATEWAY"
+echo "[..] Interfaces: WAN=$IFACE_WAN  LAN=$IFACE_LAN  Rede=$REDE_LAN  Gateway=$IP_GATEWAY"
 
 if [ -z "$IP_GATEWAY" ]; then
     # Tenta detectar da interface LAN
@@ -54,13 +55,16 @@ table ip gwos_nat {
     chain prerouting {
         type nat hook prerouting priority dstnat;
 
+        # Tráfego LAN→LAN e para o próprio gateway: não intercepta
+        iif "$IFACE_LAN" ip daddr $REDE_LAN return
+
         # Força DNS pelo BIND9 local
         iif "$IFACE_LAN" udp dport 53 redirect
         iif "$IFACE_LAN" tcp dport 53 redirect
 
-        # Proxy transparente — exclui o gateway (painel GWOS)
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy ip daddr != $IP_GATEWAY tcp dport 80 redirect to :3128
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy ip daddr != $IP_GATEWAY tcp dport 443 redirect to :3129
+        # Proxy transparente — apenas tráfego saindo para internet
+        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :3128
+        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 443 redirect to :3129
     }
 
     chain postrouting {

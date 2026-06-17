@@ -118,9 +118,12 @@ ${NAT_DNAT}
         iif "$IFACE_LAN" udp dport 53 redirect
         iif "$IFACE_LAN" tcp dport 53 redirect
 
-        # Proxy transparente — exclui o próprio gateway (painel GWOS na porta 80)
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy ip daddr != $(mysql_q "SELECT valor FROM configuracoes WHERE chave='ip_gateway'" 2>/dev/null || echo "127.0.0.1") tcp dport 80 redirect to :${SQUID_PORTA}
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy ip daddr != $(mysql_q "SELECT valor FROM configuracoes WHERE chave='ip_gateway'" 2>/dev/null || echo "127.0.0.1") tcp dport 443 redirect to :${SQUID_PORTA_SSL}
+        # Tráfego LAN→LAN (inclui o gateway): não intercepta
+        iif "$IFACE_LAN" ip daddr $(mysql_q "SELECT valor FROM configuracoes WHERE chave='rede_lan'" 2>/dev/null || echo "192.168.0.0/24") return
+
+        # Proxy transparente — apenas tráfego saindo para internet
+        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :${SQUID_PORTA}
+        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 443 redirect to :${SQUID_PORTA_SSL}
     }
 
     chain postrouting {

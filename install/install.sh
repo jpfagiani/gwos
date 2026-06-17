@@ -515,10 +515,11 @@ table ip gwos_nat {
 
     chain prerouting {
         type nat hook prerouting priority dstnat;
-        # 1:1 NAT será inserido aqui pelo painel
-        # Proxy transparente — exclui o próprio gateway (painel GWOS na porta 80)
-        iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat ip daddr != ${IP_GATEWAY} tcp dport 80 redirect to :3128
-        iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat ip daddr != ${IP_GATEWAY} tcp dport 443 redirect to :3129
+        # Tráfego LAN→LAN (inclui o gateway/painel): não intercepta
+        iif "${IFACE_LAN}" ip daddr ${REDE_LAN} return
+        # Proxy transparente — apenas tráfego saindo para internet
+        iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat tcp dport 80 redirect to :3128
+        iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat tcp dport 443 redirect to :3129
     }
 
     chain postrouting {
