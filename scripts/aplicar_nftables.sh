@@ -226,4 +226,8 @@ mysql -h"$DB_HOST" -u"$DB_USUARIO" -p"$DB_SENHA" "$DB_BANCO" \
     2>/dev/null || true
 
 rm -f /tmp/gwos_nftables_test.conf
+
+# Recarrega Squid para aplicar novos arquivos de ACL
+squid -k reconfigure 2>/dev/null || true
+
 echo "nftables e arquivos Squid aplicados com sucesso."
