@@ -339,9 +339,10 @@ if [ -n "$ADMIN_HASH" ]; then
 fi
 
 mysql gwos -e "
-    UPDATE configuracoes SET valor='${IFACE_WAN}' WHERE chave='iface_wan';
-    UPDATE configuracoes SET valor='${IFACE_LAN}' WHERE chave='iface_lan';
-    UPDATE configuracoes SET valor='${REDE_LAN}'  WHERE chave='rede_lan';
+    UPDATE configuracoes SET valor='${IFACE_WAN}'    WHERE chave='iface_wan';
+    UPDATE configuracoes SET valor='${IFACE_LAN}'    WHERE chave='iface_lan';
+    UPDATE configuracoes SET valor='${REDE_LAN}'     WHERE chave='rede_lan';
+    UPDATE configuracoes SET valor='${IP_GATEWAY}'   WHERE chave='ip_gateway';
 "
 ok "MariaDB configurado."
 
@@ -515,8 +516,9 @@ table ip gwos_nat {
     chain prerouting {
         type nat hook prerouting priority dstnat;
         # 1:1 NAT será inserido aqui pelo painel
-        # Proxy transparente HTTP
-        iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat tcp dport 80 redirect to :3128
+        # Proxy transparente — exclui o próprio gateway (painel GWOS na porta 80)
+        iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat ip daddr != ${IP_GATEWAY} tcp dport 80 redirect to :3128
+        iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat ip daddr != ${IP_GATEWAY} tcp dport 443 redirect to :3129
     }
 
     chain postrouting {

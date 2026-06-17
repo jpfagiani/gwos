@@ -118,11 +118,9 @@ ${NAT_DNAT}
         iif "$IFACE_LAN" udp dport 53 redirect
         iif "$IFACE_LAN" tcp dport 53 redirect
 
-        # Proxy transparente HTTP — LAN → Squid (exceto IPs liberados)
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :${SQUID_PORTA}
-
-        # Proxy transparente HTTPS com ssl-bump — LAN → Squid SSL
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 443 redirect to :${SQUID_PORTA_SSL}
+        # Proxy transparente — exclui o próprio gateway (painel GWOS na porta 80)
+        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy ip daddr != $(mysql_q "SELECT valor FROM configuracoes WHERE chave='ip_gateway'" 2>/dev/null || echo "127.0.0.1") tcp dport 80 redirect to :${SQUID_PORTA}
+        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy ip daddr != $(mysql_q "SELECT valor FROM configuracoes WHERE chave='ip_gateway'" 2>/dev/null || echo "127.0.0.1") tcp dport 443 redirect to :${SQUID_PORTA_SSL}
     }
 
     chain postrouting {

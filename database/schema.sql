@@ -252,9 +252,10 @@ CREATE TABLE configuracoes (
 ) ENGINE=InnoDB;
 
 INSERT INTO configuracoes (chave, valor, descricao) VALUES
-('iface_wan',         'eth0',        'Interface WAN'),
-('iface_lan',         'eth1',        'Interface LAN'),
+('iface_wan',         'eth0',           'Interface WAN'),
+('iface_lan',         'eth1',           'Interface LAN'),
 ('rede_lan',          '192.168.1.0/24', 'Rede local'),
+('ip_gateway',        '192.168.1.1',    'IP do gateway na LAN'),
 ('dns_primario',      '8.8.8.8',     'DNS primário externo'),
 ('dns_secundario',    '1.1.1.1',     'DNS secundário externo'),
 ('squid_porta',       '3128',        'Porta do Squid'),
