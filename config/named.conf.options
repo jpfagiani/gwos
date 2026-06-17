@@ -1,0 +1,38 @@
+options {
+    directory "/var/cache/bind";
+
+    // Redireciona consultas externas para resolvers públicos confiáveis
+    forwarders {
+        8.8.8.8;
+        8.8.4.4;
+        1.1.1.1;
+    };
+    forward only;
+
+    // Aceita consultas apenas da rede interna e localhost
+    allow-query     { 127.0.0.1; 192.168.1.1; localnets; };
+    allow-recursion { 127.0.0.1; 192.168.1.1; localnets; };
+
+    // Segurança
+    dnssec-validation no;
+    auth-nxdomain no;
+
+    // Ouve em todas as interfaces (Squid usa 127.0.0.1)
+    listen-on { any; };
+    listen-on-v6 { none; };
+
+    // Desativa transferência de zona
+    allow-transfer { none; };
+};
+
+logging {
+    channel default_log {
+        file "/var/log/named/default.log" versions 3 size 5m;
+        severity dynamic;
+        print-time yes;
+        print-severity yes;
+        print-category yes;
+    };
+    category default { default_log; };
+    category queries { default_log; };
+};
