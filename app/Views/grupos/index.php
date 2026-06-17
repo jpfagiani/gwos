@@ -165,7 +165,7 @@ async function carregarIps(id) {
     }
     lista.innerHTML = '<table class="table table-sm"><thead><tr><th>IP</th><th>Descrição</th><th></th></tr></thead><tbody>' +
         data.ips.map(ip =>
-            `<tr><td><code>${ip.endereco}</code></td><td class="text-muted small">${ip.descricao || ''}</td><td class="text-end">
+            `<tr><td><span class="font-monospace">${ip.endereco}</span></td><td class="text-muted small">${ip.descricao || ''}</td><td class="text-end">
             <button class="btn btn-sm btn-outline-danger" onclick="removerIp(${ip.id}, '${ip.endereco}', ${id})">
             <i class="bi bi-trash"></i></button></td></tr>`
         ).join('') + '</tbody></table>';
