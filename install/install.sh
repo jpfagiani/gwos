@@ -602,7 +602,11 @@ chmod 440 /etc/sudoers.d/gwos
 visudo -c -f /etc/sudoers.d/gwos   # valida antes de continuar
 
 chmod +x "${GWOS_DIR}/scripts/"*.sh
-ok "Permissões configuradas."
+
+# Instala o comando 'gwos' globalmente
+ln -sf "${GWOS_DIR}/scripts/gwos-cli.sh" /usr/local/bin/gwos
+chmod +x /usr/local/bin/gwos
+ok "Permissões configuradas. Comando 'gwos' disponível no terminal."
 
 # ==================================================================
 titulo "══ Arquivo de ambiente ══"
