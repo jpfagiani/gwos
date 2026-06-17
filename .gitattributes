@@ -1,0 +1,10 @@
+# Força LF nos scripts shell e configs — necessário para execução no Linux
+*.sh        text eol=lf
+*.conf      text eol=lf
+*.php       text eol=lf
+*.sql       text eol=lf
+*.js        text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.env       text eol=lf
