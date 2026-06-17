@@ -163,11 +163,18 @@ async function carregarIps(id) {
         lista.innerHTML = '<p class="text-muted small">Nenhum IP cadastrado.</p>';
         return;
     }
-    lista.innerHTML = '<table class="table table-sm"><thead><tr><th>IP</th><th>Descrição</th><th></th></tr></thead><tbody>' +
+    lista.innerHTML = '<table class="table table-sm align-middle"><thead><tr><th>Status</th><th>IP</th><th>Descrição</th><th></th></tr></thead><tbody>' +
         data.ips.map(ip =>
-            `<tr><td><span class="font-monospace">${ip.endereco}</span></td><td class="text-muted small">${ip.descricao || ''}</td><td class="text-end">
-            <button class="btn btn-sm btn-outline-danger" onclick="removerIp(${ip.id}, '${ip.endereco}', ${id})">
-            <i class="bi bi-trash"></i></button></td></tr>`
+            `<tr>
+              <td><span class="badge rounded-pill" style="background:#198754;font-size:.7rem">● ativo</span></td>
+              <td><span class="font-monospace fw-semibold text-primary">${ip.endereco}</span></td>
+              <td class="text-muted small">${ip.descricao || ''}</td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-secondary" title="Remover" onclick="removerIp(${ip.id}, '${ip.endereco}', ${id})">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </td>
+            </tr>`
         ).join('') + '</tbody></table>';
 }
 

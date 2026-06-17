@@ -103,7 +103,7 @@
                     <?php foreach ($ultimosAcessos as $a): ?>
                         <tr>
                             <td><?= h($a['data']) ?></td>
-                            <td><code><?= h($a['ip_cliente']) ?></code></td>
+                            <td><span class="font-monospace text-primary fw-semibold"><?= h($a['ip_cliente']) ?></span></td>
                             <td><?= h($a['dominio']) ?></td>
                             <td class="text-end"><?= number_format($a['acessos']) ?></td>
                             <td class="text-end"><?= formatar_bytes((int)$a['bytes']) ?></td>

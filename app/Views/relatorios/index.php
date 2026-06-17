@@ -45,7 +45,7 @@
                     <?php foreach ($registros as $r): ?>
                         <tr>
                             <td><?= h($r['data']) ?></td>
-                            <td><code><?= h($r['ip_cliente']) ?></code></td>
+                            <td><span class="font-monospace text-primary fw-semibold"><?= h($r['ip_cliente']) ?></span></td>
                             <td><?= h($r['dominio']) ?></td>
                             <td class="text-end"><?= number_format($r['acessos']) ?></td>
                             <td class="text-end"><?= formatar_bytes((int)$r['bytes']) ?></td>
