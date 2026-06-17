@@ -23,10 +23,10 @@ class RelatorioController extends Controller
         );
 
         $registros = Database::fetchAll(
-            'SELECT data, ip_cliente, dominio, total_requisicoes, total_bytes
+            'SELECT data, ip_cliente, dominio, acessos, bytes
              FROM relatorio_diario
              WHERE data BETWEEN ? AND ?
-             ORDER BY data DESC, total_requisicoes DESC
+             ORDER BY data DESC, acessos DESC
              LIMIT ? OFFSET ?',
             [$data_inicio, $data_fim, $por_pag, $offset]
         );

@@ -105,8 +105,8 @@
                             <td><?= h($a['data']) ?></td>
                             <td><code><?= h($a['ip_cliente']) ?></code></td>
                             <td><?= h($a['dominio']) ?></td>
-                            <td class="text-end"><?= number_format($a['total_requisicoes']) ?></td>
-                            <td class="text-end"><?= formatar_bytes((int)$a['total_bytes']) ?></td>
+                            <td class="text-end"><?= number_format($a['acessos']) ?></td>
+                            <td class="text-end"><?= formatar_bytes((int)$a['bytes']) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>

@@ -47,8 +47,8 @@
                             <td><?= h($r['data']) ?></td>
                             <td><code><?= h($r['ip_cliente']) ?></code></td>
                             <td><?= h($r['dominio']) ?></td>
-                            <td class="text-end"><?= number_format($r['total_requisicoes']) ?></td>
-                            <td class="text-end"><?= formatar_bytes((int)$r['total_bytes']) ?></td>
+                            <td class="text-end"><?= number_format($r['acessos']) ?></td>
+                            <td class="text-end"><?= formatar_bytes((int)$r['bytes']) ?></td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>

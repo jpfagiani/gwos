@@ -18,9 +18,9 @@ class DashboardController extends Controller
         $totalNat     = (int) Database::valor('SELECT COUNT(*) FROM nat_um_para_um');
 
         $ultimosAcessos = Database::fetchAll(
-            'SELECT data, ip_cliente, dominio, total_requisicoes, total_bytes
+            'SELECT data, ip_cliente, dominio, acessos, bytes
              FROM relatorio_diario
-             ORDER BY data DESC, total_requisicoes DESC
+             ORDER BY data DESC, acessos DESC
              LIMIT 10'
         );
 
