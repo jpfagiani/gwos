@@ -38,7 +38,7 @@
                     Um token de 8 caracteres será gerado — encaminhe ao usuário pelo canal seguro de sua preferência.
                 </p>
                 <form method="POST" action="/senha/gerar">
-                    <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+                    
                     <div class="mb-3">
                         <label class="form-label fw-semibold">E-mail do usuário</label>
                         <input type="email" name="email" class="form-control"

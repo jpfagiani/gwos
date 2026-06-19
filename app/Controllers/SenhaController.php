@@ -113,11 +113,6 @@ class SenhaController extends Controller
             $this->redirect('/');
         }
 
-        if (!csrf_verificar()) {
-            Session::flash('erro_gerar', 'Token de segurança inválido.');
-            $this->redirect('/senha/gerar');
-        }
-
         $email = trim($_POST['email'] ?? '');
 
         $token = Auth::gerarTokenReset($email);
