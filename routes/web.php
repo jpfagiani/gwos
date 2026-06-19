@@ -34,3 +34,10 @@ $router->get('/relatorios', 'RelatorioController@index');
 
 $router->get('/configuracoes', 'ConfigController@index');
 $router->post('/configuracoes', 'ConfigController@salvar');
+
+$router->get('/senha/trocar',  'SenhaController@formularioTrocar');
+$router->post('/senha/trocar', 'SenhaController@trocar');
+$router->get('/senha/reset',   'SenhaController@formularioReset');
+$router->post('/senha/reset',  'SenhaController@reset');
+$router->get('/senha/gerar',   'SenhaController@formularioGerar');
+$router->post('/senha/gerar',  'SenhaController@gerar');

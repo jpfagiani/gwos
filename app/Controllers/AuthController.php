@@ -35,7 +35,8 @@ class AuthController extends Controller
             $this->redirect('/');
         }
 
-        Session::flash('erro_login', 'E-mail ou senha incorretos.');
+        $msg = Auth::mensagemBloqueio($email) ?? 'E-mail ou senha incorretos.';
+        Session::flash('erro_login', $msg);
         $this->redirect('/login');
     }
 

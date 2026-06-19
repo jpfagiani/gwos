@@ -99,6 +99,14 @@
         <a class="nav-link <?= ($modulo ?? '') === 'configuracoes' ? 'active' : '' ?>" href="/configuracoes">
             <i class="bi bi-gear-fill"></i> Configurações
         </a>
+        <a class="nav-link <?= ($modulo ?? '') === 'senha' ? 'active' : '' ?>" href="/senha/trocar">
+            <i class="bi bi-key-fill"></i> Alterar Senha
+        </a>
+        <?php if ((\App\Core\Auth::admin()['perfil'] ?? '') === 'superadmin'): ?>
+        <a class="nav-link" href="/senha/gerar">
+            <i class="bi bi-person-lock"></i> Reset de Senha
+        </a>
+        <?php endif; ?>
         <a class="nav-link" href="/logout">
             <i class="bi bi-box-arrow-left"></i> Sair
         </a>

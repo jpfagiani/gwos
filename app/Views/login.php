@@ -31,6 +31,11 @@
 
     <div class="card shadow-lg border-0">
         <div class="card-body p-4">
+            <?php
+            $flash_reset = \App\Core\Session::flash('sucesso_login');
+            if ($flash_reset): ?>
+                <div class="alert alert-success py-2 small"><?= h($flash_reset) ?></div>
+            <?php endif; ?>
             <?php if (!empty($erro)): ?>
                 <div class="alert alert-danger py-2 small"><?= h($erro) ?></div>
             <?php endif; ?>
@@ -59,9 +64,15 @@
                     <i class="bi bi-box-arrow-in-right me-1"></i> Entrar
                 </button>
             </form>
+
+            <div class="text-center mt-3">
+                <a href="/senha/reset" class="text-secondary small">
+                    <i class="bi bi-question-circle me-1"></i>Esqueci minha senha
+                </a>
+            </div>
         </div>
     </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

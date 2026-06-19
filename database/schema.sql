@@ -13,15 +13,20 @@ USE gwos;
 -- Administradores
 -- ------------------------------------------------------------
 CREATE TABLE admins (
-    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    nome        VARCHAR(100)        NOT NULL,
-    email       VARCHAR(150)        NOT NULL UNIQUE,
-    senha       VARCHAR(255)        NOT NULL,
-    perfil      ENUM('superadmin','admin','operador') NOT NULL DEFAULT 'operador',
-    ativo       TINYINT(1)          NOT NULL DEFAULT 1,
-    ultimo_login DATETIME           NULL,
-    criado_em   DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    nome          VARCHAR(100)        NOT NULL,
+    email         VARCHAR(150)        NOT NULL UNIQUE,
+    senha         VARCHAR(255)        NOT NULL,
+    perfil        ENUM('superadmin','admin','operador') NOT NULL DEFAULT 'operador',
+    ativo         TINYINT(1)          NOT NULL DEFAULT 1,
+    ultimo_login  DATETIME            NULL,
+    reset_token   VARCHAR(12)         NULL,
+    reset_expira  DATETIME            NULL,
+    tentativas    TINYINT UNSIGNED    NOT NULL DEFAULT 0,
+    bloqueado_ate DATETIME            NULL,
+    primeiro_login TINYINT(1)         NOT NULL DEFAULT 1,
+    criado_em     DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 CREATE TABLE admin_sessoes (

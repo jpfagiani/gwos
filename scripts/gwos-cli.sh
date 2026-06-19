@@ -454,7 +454,41 @@ cmd_help() {
     echo "  backup criar                 Criar backup agora"
     echo "  backup listar                Listar backups"
     echo "  backup restaurar <arquivo>   Restaurar backup"
+    echo -e "${B}Usuários/Senha:${N}"
+    echo "  resetsenha <email>           Gerar token de reset e forçar troca"
+    echo "  desbloqueio <email>          Desbloquear conta após tentativas excessivas"
     echo ""
+}
+
+# ==================================================================
+# RESET DE SENHA / DESBLOQUEIO
+# ==================================================================
+cmd_resetsenha() {
+    local email="${1:-}"
+    [ -n "$email" ] || { erro "Uso: gwos resetsenha <email>"; exit 1; }
+    TOKEN=$(php -r "
+        require '${GWOS_DIR}/bootstrap/app.php';
+        \$t = \App\Core\Auth::gerarTokenReset('${email}');
+        echo \$t ?? '';
+    " 2>/dev/null)
+    if [ -z "$TOKEN" ]; then
+        erro "E-mail não encontrado ou usuário inativo: ${email}"
+        exit 1
+    fi
+    echo ""
+    echo -e "${G}Token gerado para ${email}:${N}"
+    echo -e "  ${B}${TOKEN}${N}"
+    echo ""
+    echo "Encaminhe o token ao usuário. Ele deve acessar: https://<ip-gateway>/senha/reset"
+    echo "O token expira em 24 horas."
+    echo ""
+}
+
+cmd_desbloqueio() {
+    local email="${1:-}"
+    [ -n "$email" ] || { erro "Uso: gwos desbloqueio <email>"; exit 1; }
+    mysql gwos -e "UPDATE admins SET tentativas=0, bloqueado_ate=NULL WHERE email='${email}';" 2>/dev/null
+    ok "Conta desbloqueada: ${email}"
 }
 
 # ==================================================================
@@ -471,6 +505,8 @@ case "$CMD" in
     log|logs)           cmd_log "$@" ;;
     backup)             cmd_backup "$@" ;;
     diag|diagnostico)   cmd_diag ;;
+    resetsenha)         cmd_resetsenha "$@" ;;
+    desbloqueio)        cmd_desbloqueio "$@" ;;
     help|--help|-h)     cmd_help ;;
     *)
         erro "Comando desconhecido: $CMD"
