@@ -40,8 +40,8 @@
                             </td>
                             <td class="text-muted small"><?= h($g['descricao'] ?? '') ?></td>
                             <td class="text-center">
-                                <button class="btn btn-sm btn-outline-primary" onclick="verIps(<?= $g['id'] ?>, '<?= h($g['nome']) ?>')">
-                                    <i class="bi bi-pc-display me-1"></i><?= (int)$g['total_ips'] ?>
+                                <button id="btn-ips-<?= $g['id'] ?>" class="btn btn-sm btn-outline-primary" onclick="verIps(<?= $g['id'] ?>, '<?= h($g['nome']) ?>')">
+                                    <i class="bi bi-pc-display me-1"></i><span class="ip-count"><?= (int)$g['total_ips'] ?></span>
                                 </button>
                             </td>
                             <td class="text-end">
@@ -193,6 +193,7 @@ document.getElementById('formIp').addEventListener('submit', async e => {
         e.target.reset();
         document.getElementById('ipGrupoId').value = gid;
         await carregarIps(gid);
+        atualizarContador(gid);
     }
 });
 
@@ -203,7 +204,17 @@ async function removerIp(id, endereco, grupoId) {
     fd.append('_method', 'DELETE');
     const res = await fetch('/ips/' + id, { method: 'POST', body: fd });
     const data = await res.json();
-    if (data.erro) { alert(data.erro); } else { await carregarIps(grupoId); }
+    if (data.erro) { alert(data.erro); } else {
+        await carregarIps(grupoId);
+        atualizarContador(grupoId);
+    }
+}
+
+async function atualizarContador(gid) {
+    const res = await fetch('/grupos/' + gid + '/ips');
+    const data = await res.json();
+    const btn = document.getElementById('btn-ips-' + gid);
+    if (btn) btn.querySelector('.ip-count').textContent = data.ips ? data.ips.length : 0;
 }
 
 async function aplicarNftables() {
