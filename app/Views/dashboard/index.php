@@ -1,58 +1,49 @@
 <?php $titulo = 'Dashboard'; $modulo = 'dashboard'; ?>
 
-<!-- Cards: IP / Gateway / DNS / Conexões -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm p-3">
-            <div class="small text-muted mb-1"><i class="bi bi-hdd-rack me-1"></i>IP do servidor</div>
-            <div class="fw-semibold font-monospace text-info" id="infoIp">—</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm p-3">
-            <div class="small text-muted mb-1"><i class="bi bi-router me-1"></i>Gateway</div>
-            <div class="fw-semibold font-monospace text-info" id="infoGw">—</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm p-3">
-            <div class="small text-muted mb-1"><i class="bi bi-globe me-1"></i>DNS</div>
-            <div class="fw-semibold font-monospace text-info" id="infoDns">—</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-3">
-        <div class="card border-0 shadow-sm p-3">
-            <div class="small text-muted mb-1"><i class="bi bi-activity me-1"></i>Conexões hoje</div>
-            <div class="fw-semibold text-success" id="infoConn">—</div>
-        </div>
-    </div>
-</div>
+<!-- Faixa superior: info do servidor + status dos serviços -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-2 px-3">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <!-- Info compacta -->
+            <div class="d-flex align-items-center gap-1 text-muted small">
+                <i class="bi bi-hdd-rack"></i>
+                <span class="font-monospace text-info fw-semibold" id="infoIp">—</span>
+            </div>
+            <div class="vr"></div>
+            <div class="d-flex align-items-center gap-1 text-muted small">
+                <i class="bi bi-router"></i>
+                <span class="font-monospace text-info fw-semibold" id="infoGw">—</span>
+            </div>
+            <div class="vr"></div>
+            <div class="d-flex align-items-center gap-1 text-muted small">
+                <i class="bi bi-globe"></i>
+                <span class="font-monospace text-info fw-semibold" id="infoDns">—</span>
+            </div>
+            <div class="vr"></div>
+            <div class="d-flex align-items-center gap-1 text-muted small">
+                <i class="bi bi-activity"></i>
+                <span class="text-success fw-semibold" id="infoConn">—</span>
+                <span>conexões hoje</span>
+            </div>
 
-<!-- Status dos serviços -->
-<div class="row g-3 mb-4">
-    <?php
-    $nomes = [
-        'squid'    => 'Squid (Proxy)',
-        'named'    => 'BIND9 (DNS)',
-        'nftables' => 'nftables (Firewall)',
-        'nginx'    => 'Nginx (Web)',
-        'mariadb'  => 'MariaDB',
-    ];
-    foreach ($servicos as $svc => $ativo): ?>
-        <div class="col-md-4 col-lg-2">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body text-center py-3">
-                    <div class="mb-1">
-                        <i class="bi bi-circle-fill text-<?= $ativo ? 'success' : 'danger' ?>" style="font-size:1.4rem;"></i>
-                    </div>
-                    <div class="fw-semibold small"><?= h($nomes[$svc] ?? $svc) ?></div>
-                    <span class="badge bg-<?= $ativo ? 'success' : 'danger' ?> mt-1">
-                        <?= $ativo ? 'Ativo' : 'Inativo' ?>
+            <div class="ms-auto d-flex flex-wrap gap-2">
+                <?php
+                $nomes = [
+                    'squid'    => 'Squid',
+                    'named'    => 'BIND9',
+                    'nftables' => 'Firewall',
+                    'nginx'    => 'Nginx',
+                    'mariadb'  => 'MariaDB',
+                ];
+                foreach ($servicos as $svc => $ativo): ?>
+                    <span class="badge rounded-pill bg-<?= $ativo ? 'success' : 'danger' ?> d-flex align-items-center gap-1" style="font-size:.75rem;padding:.4em .75em">
+                        <i class="bi bi-circle-fill" style="font-size:.5rem"></i>
+                        <?= h($nomes[$svc] ?? $svc) ?>
                     </span>
-                </div>
+                <?php endforeach; ?>
             </div>
         </div>
-    <?php endforeach; ?>
+    </div>
 </div>
 
 <!-- Contadores resumo -->

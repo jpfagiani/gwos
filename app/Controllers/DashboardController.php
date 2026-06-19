@@ -31,7 +31,7 @@ class DashboardController extends Controller
     {
         $arquivo = '/var/log/squid/access.log';
         if (!is_readable($arquivo)) return [];
-        $fp = popen('tail -n ' . $n . ' ' . escapeshellarg($arquivo), 'r');
+        $fp = popen('sudo tail -n ' . $n . ' ' . escapeshellarg($arquivo) . ' 2>/dev/null', 'r');
         if (!$fp) return [];
         $linhas = [];
         while (($l = fgets($fp)) !== false) $linhas[] = trim($l);

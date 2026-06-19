@@ -121,6 +121,9 @@
             <i class="bi bi-person-circle"></i>
             <?= h(\App\Core\Auth::admin()['nome'] ?? '') ?>
             <span class="badge bg-secondary"><?= h(\App\Core\Auth::admin()['perfil'] ?? '') ?></span>
+            <a href="/logout" class="btn btn-sm btn-outline-danger" title="Sair">
+                <i class="bi bi-box-arrow-right"></i> Sair
+            </a>
         </div>
     </div>
 
