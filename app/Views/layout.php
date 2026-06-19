@@ -116,7 +116,8 @@
 <div id="content">
     <div id="topbar">
         <span class="fw-semibold text-secondary"><?= h($titulo ?? '') ?></span>
-        <div class="d-flex align-items-center gap-2 text-secondary small">
+        <div class="d-flex align-items-center gap-3 text-secondary small">
+            <span id="relogioTopo" class="font-monospace text-muted"></span>
             <i class="bi bi-person-circle"></i>
             <?= h(\App\Core\Auth::admin()['nome'] ?? '') ?>
             <span class="badge bg-secondary"><?= h(\App\Core\Auth::admin()['perfil'] ?? '') ?></span>

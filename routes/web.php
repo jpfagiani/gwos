@@ -5,6 +5,7 @@ $router->post('/login', 'AuthController@autenticar');
 $router->get('/logout', 'AuthController@sair');
 
 $router->get('/', 'DashboardController@index');
+$router->get('/dashboard/info', 'DashboardController@info');
 
 $router->get('/grupos', 'GrupoController@index');
 $router->post('/grupos', 'GrupoController@criar');
