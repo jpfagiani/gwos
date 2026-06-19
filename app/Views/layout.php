@@ -12,7 +12,7 @@
         body { background: #f4f6f9; }
         #sidebar {
             min-height: 100vh;
-            width: 240px;
+            width: 185px;
             background: #1a2332;
             color: #c8d0dc;
             position: fixed;
@@ -51,7 +51,7 @@
             padding: 1rem 1.5rem .3rem;
         }
         #content {
-            margin-left: 240px;
+            margin-left: 185px;
             min-height: 100vh;
         }
         #topbar {
