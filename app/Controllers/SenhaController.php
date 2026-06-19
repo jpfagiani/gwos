@@ -21,11 +21,6 @@ class SenhaController extends Controller
     {
         Auth::exigir();
 
-        if (!csrf_verificar()) {
-            Session::flash('erro_senha', 'Token de segurança inválido.');
-            $this->redirect('/senha/trocar');
-        }
-
         $senhaAtual = $_POST['senha_atual'] ?? '';
         $novaSenha  = $_POST['nova_senha']  ?? '';
         $confirmar  = $_POST['confirmar']   ?? '';
@@ -63,11 +58,6 @@ class SenhaController extends Controller
     // POST /senha/reset
     public function reset(): void
     {
-        if (!csrf_verificar()) {
-            Session::flash('erro_reset', 'Token de segurança inválido.');
-            $this->redirect('/senha/reset');
-        }
-
         $email     = trim($_POST['email']      ?? '');
         $token     = trim($_POST['token']      ?? '');
         $novaSenha = $_POST['nova_senha']       ?? '';

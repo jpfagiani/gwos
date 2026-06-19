@@ -23,7 +23,7 @@
             </div>
             <div class="card-body p-4">
                 <form method="POST" action="/senha/trocar" id="form-senha">
-                    <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+                    
 
                     <?php if (empty($primeiroLogin)): ?>
                     <div class="mb-3">

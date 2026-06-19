@@ -35,7 +35,7 @@
                 para o seu e-mail. Em seguida, preencha os campos abaixo.
             </p>
             <form method="POST" action="/senha/reset" id="form-reset">
-                <input type="hidden" name="csrf_token" value="<?= h(csrf_token()) ?>">
+                
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">E-mail</label>
