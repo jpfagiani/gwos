@@ -43,6 +43,8 @@ class DominioController extends Controller
 
         Auditoria::registrar('criar_dominio', 'dominios', (int)$id, null, compact('dominio', 'tipo'));
 
+        $this->aplicarRegras();
+
         json_resposta(['sucesso' => 'Domínio adicionado.', 'id' => $id]);
     }
 
@@ -57,6 +59,8 @@ class DominioController extends Controller
         Database::execute('DELETE FROM dominios WHERE id = ?', [$id]);
         Auditoria::registrar('remover_dominio', 'dominios', (int)$id, $dominio, null);
 
+        $this->aplicarRegras();
+
         json_resposta(['sucesso' => 'Domínio removido.']);
     }
 
@@ -65,12 +69,16 @@ class DominioController extends Controller
         Auth::exigir();
         if (!csrf_verificar()) { json_resposta(['erro' => 'Token inválido.'], 403); }
 
-        $scripts = config('sistema.scripts_dir', '/opt/gwos/scripts');
-        shell_exec("sudo {$scripts}/gerar_squid_dominios.sh > /dev/null 2>&1 &");
-        shell_exec("sudo {$scripts}/aplicar_bind9_rpz.sh > /dev/null 2>&1 &");
-
+        $this->aplicarRegras();
         Auditoria::registrar('aplicar_dominios', 'dominios', null, null, null);
 
         json_resposta(['sucesso' => 'Listas de domínios reaplicadas.']);
+    }
+
+    private function aplicarRegras(): void
+    {
+        $scripts = config('sistema.scripts_dir', '/opt/gwos/scripts');
+        shell_exec("sudo {$scripts}/gerar_squid_dominios.sh > /dev/null 2>&1 &");
+        shell_exec("sudo {$scripts}/aplicar_bind9_rpz.sh > /dev/null 2>&1 &");
     }
 }

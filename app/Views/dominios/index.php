@@ -29,7 +29,7 @@ $blacklist  = array_filter($dominios, fn($d) => $d['tipo'] === 'blacklist');
     <?php foreach ([['tabWhite','whitelist','success','Whitelist'],['tabBlack','blacklist','danger','Blacklist']] as [$tabId, $tipo, $cor, $label]): ?>
     <div class="tab-pane fade <?= $tabId === 'tabWhite' ? 'show active' : '' ?>" id="<?= $tabId ?>">
         <div class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-white">
+            <div class="card-header bg-white d-flex flex-column gap-2">
                 <form class="d-flex gap-2" onsubmit="adicionarDominio(event, '<?= $tipo ?>')">
                     <input type="hidden" name="tipo" value="<?= $tipo ?>">
                     <input type="text" name="dominio" class="form-control form-control-sm"
@@ -38,10 +38,13 @@ $blacklist  = array_filter($dominios, fn($d) => $d['tipo'] === 'blacklist');
                         <i class="bi bi-plus-lg"></i> Adicionar à <?= $label ?>
                     </button>
                 </form>
-                <div id="erro-<?= $tipo ?>" class="text-danger small mt-1 d-none"></div>
+                <div id="erro-<?= $tipo ?>" class="text-danger small d-none"></div>
+                <input type="search" class="form-control form-control-sm busca-dominio"
+                       data-tabela="tbl-<?= $tipo ?>"
+                       placeholder="Buscar domínio na <?= $label ?>…">
             </div>
             <div class="table-responsive">
-                <table class="table table-hover small mb-0">
+                <table class="table table-hover small mb-0" id="tbl-<?= $tipo ?>">
                     <thead class="table-light">
                         <tr><th>Domínio</th><th>Origem</th><th class="text-end">Ações</th></tr>
                     </thead>
@@ -99,6 +102,17 @@ async function removerDominio(id, dominio) {
     const data = await res.json();
     if (data.erro) { alert(data.erro); } else { location.reload(); }
 }
+
+document.querySelectorAll('.busca-dominio').forEach(input => {
+    input.addEventListener('input', function() {
+        const termo = this.value.toLowerCase();
+        const tabela = document.getElementById(this.dataset.tabela);
+        tabela.querySelectorAll('tbody tr').forEach(tr => {
+            const texto = tr.querySelector('code')?.textContent.toLowerCase() ?? '';
+            tr.style.display = texto.includes(termo) ? '' : 'none';
+        });
+    });
+});
 
 async function aplicarDominios() {
     if (!confirm('Reaplicar listas de domínios agora?')) return;
