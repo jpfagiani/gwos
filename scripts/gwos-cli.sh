@@ -371,6 +371,14 @@ cmd_backup() {
 }
 
 # ==================================================================
+# DNS INTERNO (zona cdpni.local)
+# ==================================================================
+cmd_dns() {
+    need_root "dns"
+    bash "$GWOS_DIR/scripts/aplicar_dns_hosts.sh" "$@"
+}
+
+# ==================================================================
 # DIAGNÓSTICO
 # ==================================================================
 cmd_diag() {
@@ -454,6 +462,12 @@ cmd_help() {
     echo "  backup criar                 Criar backup agora"
     echo "  backup listar                Listar backups"
     echo "  backup restaurar <arquivo>   Restaurar backup"
+    echo -e "${B}DNS interno (cdpni.local):${N}"
+    echo "  dns list                     Listar hosts cadastrados"
+    echo "  dns add <host> <ip>          Adicionar host (ex: gwos dns add cdpni 10.14.29.8)"
+    echo "  dns update <host> <ip>       Alterar IP de um host (propaga em 60s)"
+    echo "  dns del <host>               Remover host"
+    echo ""
     echo -e "${B}Usuários/Senha:${N}"
     echo "  resetsenha <email>           Gerar token de reset e forçar troca"
     echo "  desbloqueio <email>          Desbloquear conta após tentativas excessivas"
@@ -505,6 +519,7 @@ case "$CMD" in
     log|logs)           cmd_log "$@" ;;
     backup)             cmd_backup "$@" ;;
     diag|diagnostico)   cmd_diag ;;
+    dns)                cmd_dns "$@" ;;
     resetsenha)         cmd_resetsenha "$@" ;;
     desbloqueio)        cmd_desbloqueio "$@" ;;
     help|--help|-h)     cmd_help ;;

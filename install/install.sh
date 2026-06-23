@@ -395,9 +395,13 @@ titulo "══ BIND9 ══"
 cp "${GWOS_DIR}/config/named.conf.options" /etc/bind/named.conf.options
 cp "${GWOS_DIR}/config/named.conf.local"   /etc/bind/named.conf.local
 cp "${GWOS_DIR}/config/db.rpz.gwos"        /etc/bind/db.rpz.gwos
-chown bind:bind /etc/bind/named.conf.options /etc/bind/named.conf.local /etc/bind/db.rpz.gwos
+cp "${GWOS_DIR}/config/db.cdpni.local"     /etc/bind/db.cdpni.local
+chown bind:bind /etc/bind/named.conf.options /etc/bind/named.conf.local \
+                /etc/bind/db.rpz.gwos /etc/bind/db.cdpni.local
 
-sed -i "s|192\.168\.1\.1;|${IP_GATEWAY};|g" /etc/bind/named.conf.options
+# Substitui o NS da zona local pelo IP real do gateway
+sed -i "s|192\.168\.1\.1;|${IP_GATEWAY};|g"  /etc/bind/named.conf.options
+sed -i "s|192\.168\.1\.1|${IP_GATEWAY}|g"     /etc/bind/db.cdpni.local
 
 mkdir -p /var/log/named
 chown bind:bind /var/log/named

@@ -1,0 +1,22 @@
+; GWOS — Zona interna cdpni.local
+; Gerenciada pelo comando: gwos dns <add|update|del|list>
+; NÃO edite manualmente — use o comando gwos dns.
+;
+; TTL baixo (60s) para que mudanças de IP propaguem rápido.
+
+$TTL 60
+@   IN SOA  ns.cdpni.local. admin.cdpni.local. (
+        2024010101  ; serial — incrementado automaticamente pelo gwos dns
+        3600        ; refresh
+        900         ; retry
+        604800      ; expire
+        60          ; minimum TTL
+)
+
+; Nameserver desta zona (o próprio gateway)
+@       IN NS   ns.cdpni.local.
+ns      IN A    192.168.1.1
+
+; ── Hosts da LAN ─────────────────────────────────────────────────────────────
+; Adicionados/atualizados via: gwos dns add <host> <ip>
+; cdpni   IN A    10.14.29.8

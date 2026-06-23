@@ -41,17 +41,13 @@ zone "prodesp.sp.gov.br" {
 };
 
 // ---------------------------------------------------------
-// Zona interna local (opcional — resolução de nomes da LAN)
-// Descomente e ajuste se quiser resolução interna.
+// Zona interna local — resolução de nomes da LAN
+// Gerenciada pelo comando: gwos dns <add|update|del|list>
+// Arquivo de hosts: /etc/bind/db.hosts.local
 // ---------------------------------------------------------
-// zone "rede.local" {
-//     type master;
-//     file "/etc/bind/db.rede.local";
-//     allow-query { localnets; };
-// };
-//
-// zone "1.168.192.in-addr.arpa" {
-//     type master;
-//     file "/etc/bind/db.192.168.1";
-//     allow-query { localnets; };
-// };
+zone "cdpni.local" {
+    type master;
+    file "/etc/bind/db.cdpni.local";
+    allow-query  { localnets; };
+    allow-update { none; };
+};
