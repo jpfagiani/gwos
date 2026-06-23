@@ -41,13 +41,12 @@ zone "prodesp.sp.gov.br" {
 };
 
 // ---------------------------------------------------------
-// Zona interna local — resolução de nomes da LAN
+// Zona interna local — nomes da LAN (servidores, impressoras, etc.)
+// Resolvida pelo dnsmasq em 127.0.0.1:5353 via /etc/hosts.
 // Gerenciada pelo comando: gwos dns <add|update|del|list>
-// Arquivo de hosts: /etc/bind/db.hosts.local
 // ---------------------------------------------------------
 zone "cdpni.local" {
-    type master;
-    file "/etc/bind/db.cdpni.local";
-    allow-query  { localnets; };
-    allow-update { none; };
+    type forward;
+    forward only;
+    forwarders { 127.0.0.1 port 5353; };
 };

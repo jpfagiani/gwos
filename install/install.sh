@@ -234,7 +234,7 @@ info "Instalando dependências..."
 # squid-openssl é necessário para SSL Bump (intercepção HTTPS)
 # No Debian 13, squid e squid-openssl são mutuamente exclusivos
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    nftables bind9 bind9-utils chrony ifupdown sudo \
+    nftables bind9 bind9-utils dnsmasq chrony ifupdown sudo \
     mariadb-server \
     php8.4 php8.4-fpm php8.4-mysql php8.4-mbstring \
     php8.4-curl php8.4-zip php8.4-xml php8.4-intl \
@@ -395,13 +395,10 @@ titulo "══ BIND9 ══"
 cp "${GWOS_DIR}/config/named.conf.options" /etc/bind/named.conf.options
 cp "${GWOS_DIR}/config/named.conf.local"   /etc/bind/named.conf.local
 cp "${GWOS_DIR}/config/db.rpz.gwos"        /etc/bind/db.rpz.gwos
-cp "${GWOS_DIR}/config/db.cdpni.local"     /etc/bind/db.cdpni.local
 chown bind:bind /etc/bind/named.conf.options /etc/bind/named.conf.local \
-                /etc/bind/db.rpz.gwos /etc/bind/db.cdpni.local
+                /etc/bind/db.rpz.gwos
 
-# Substitui o NS da zona local pelo IP real do gateway
-sed -i "s|192\.168\.1\.1;|${IP_GATEWAY};|g"  /etc/bind/named.conf.options
-sed -i "s|192\.168\.1\.1|${IP_GATEWAY}|g"     /etc/bind/db.cdpni.local
+sed -i "s|192\.168\.1\.1;|${IP_GATEWAY};|g" /etc/bind/named.conf.options
 
 mkdir -p /var/log/named
 chown bind:bind /var/log/named
@@ -410,6 +407,44 @@ chmod 755 /var/log/named
 named-checkconf
 systemctl enable --now named
 ok "BIND9 configurado."
+
+# ==================================================================
+titulo "══ dnsmasq (resolução de nomes internos da LAN) ══"
+# ==================================================================
+
+# Desativa o serviço padrão do dnsmasq se estiver rodando em :53
+# (o BIND9 já usa a porta 53; o dnsmasq ficará em :5353 no loopback)
+systemctl stop dnsmasq 2>/dev/null || true
+systemctl disable dnsmasq 2>/dev/null || true
+
+# Remove configurações padrão que causariam conflito
+rm -f /etc/dnsmasq.conf
+mkdir -p /etc/dnsmasq.d
+
+cp "${GWOS_DIR}/config/dnsmasq-gwos.conf" /etc/dnsmasq.d/gwos.conf
+
+# Cria serviço dedicado gwos-dnsmasq para não conflitar com o dnsmasq padrão
+cat > /etc/systemd/system/gwos-dnsmasq.service << UNIT
+[Unit]
+Description=GWOS dnsmasq — resolucao de nomes internos da LAN
+After=network.target named.service
+Wants=named.service
+
+[Service]
+Type=forking
+ExecStart=/usr/sbin/dnsmasq --conf-file=/etc/dnsmasq.d/gwos.conf --pid-file=/run/gwos-dnsmasq.pid
+PIDFile=/run/gwos-dnsmasq.pid
+ExecReload=/bin/kill -HUP \$MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now gwos-dnsmasq
+ok "dnsmasq configurado em 127.0.0.1:5353 para nomes internos."
+ok "Adicione hosts com: gwos dns add <nome> <ip>"
 
 # ==================================================================
 titulo "══ Squid ══"

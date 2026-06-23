@@ -59,7 +59,7 @@ cmd_status() {
     printf "  %-20s %s\n" "Serviço" "Estado"
     echo "  ──────────────────────────────────────────"
 
-    for SVC in squid nginx php8.4-fpm named mariadb nftables chrony; do
+    for SVC in squid nginx php8.4-fpm named gwos-dnsmasq mariadb nftables chrony; do
         STATUS=$(systemctl is-active "$SVC" 2>/dev/null || echo "inativo")
         if [ "$STATUS" = "active" ]; then
             printf "  %-20s ${G}%s${N}\n" "$SVC" "● ativo"
@@ -109,9 +109,13 @@ cmd_reload() {
             info "Recarregando Nginx..."
             nginx -t && systemctl reload nginx && ok "Nginx recarregado."
             ;;&
-        bind|named|dns|all)
+        bind|named|all)
             info "Recarregando BIND9..."
             named-checkconf && systemctl reload named && ok "BIND9 recarregado."
+            ;;&
+        dnsmasq|dns-interno|all)
+            info "Recarregando dnsmasq (nomes internos)..."
+            systemctl reload gwos-dnsmasq && ok "dnsmasq recarregado."
             ;;&
         nftables|firewall|all)
             info "Reaplicando nftables..."
@@ -393,6 +397,15 @@ cmd_diag() {
     info "Testando configuração do BIND9..."
     named-checkconf 2>&1 && ok "named.conf OK" || erro "named.conf com erros"
 
+    # dnsmasq
+    info "Testando dnsmasq (nomes internos)..."
+    systemctl is-active gwos-dnsmasq &>/dev/null \
+        && ok "gwos-dnsmasq ativo em 127.0.0.1:5353" \
+        || erro "gwos-dnsmasq inativo"
+    dig +short +time=2 @127.0.0.1 -p 5353 localhost &>/dev/null \
+        && ok "dnsmasq respondendo em :5353" \
+        || erro "dnsmasq não responde em :5353"
+
     # Nginx
     info "Testando configuração do Nginx..."
     nginx -t 2>&1 && ok "nginx.conf OK" || erro "nginx.conf com erros"
@@ -429,7 +442,7 @@ cmd_help() {
     echo ""
     echo -e "${B}Comandos:${N}"
     echo "  status                       Status de todos os serviços"
-    echo "  reload [serviço]             Recarregar (all|squid|nginx|bind|nftables|dominios)"
+    echo "  reload [serviço]             Recarregar (all|squid|nginx|bind|dnsmasq|nftables|dominios)"
     echo "  diag                         Diagnóstico completo do sistema"
     echo ""
     echo -e "${B}NAT 1:1:${N}"
