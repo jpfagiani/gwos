@@ -485,6 +485,85 @@ cmd_help() {
     echo "  resetsenha <email>           Gerar token de reset e forçar troca"
     echo "  desbloqueio <email>          Desbloquear conta após tentativas excessivas"
     echo ""
+    echo -e "${B}Sistema:${N}"
+    echo "  update                       Atualizar GWOS via git (sem reinstalar)"
+    echo ""
+}
+
+# ==================================================================
+# UPDATE — puxa git e copia arquivos da aplicação
+# ==================================================================
+cmd_update() {
+    need_root
+    local REPO="$GWOS_DIR"
+    local WEB_DIR="/var/www/gwos"
+
+    titulo "══ GWOS Update ══"
+    echo ""
+
+    # Verifica se é repositório git
+    if ! git -C "$REPO" rev-parse --is-inside-work-tree &>/dev/null; then
+        erro "Diretório $REPO não é um repositório git."
+        echo "  Clone o repositório primeiro: git clone https://github.com/jpfagiani/gwos $REPO"
+        exit 1
+    fi
+
+    # Commit atual antes do pull
+    local ANTES
+    ANTES=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "?")
+    info "Versão atual: $ANTES"
+
+    # Pull
+    info "Buscando atualizações..."
+    git -C "$REPO" fetch origin main 2>&1 | sed 's/^/  /'
+    local REMOTO
+    REMOTO=$(git -C "$REPO" rev-parse --short origin/main 2>/dev/null || echo "?")
+
+    if [ "$ANTES" = "$REMOTO" ]; then
+        ok "Já está na versão mais recente ($ANTES). Nada a fazer."
+        exit 0
+    fi
+
+    git -C "$REPO" pull --ff-only origin main 2>&1 | sed 's/^/  /'
+    local DEPOIS
+    DEPOIS=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "?")
+    ok "Atualizado: $ANTES → $DEPOIS"
+
+    # Mostra commits novos
+    echo ""
+    info "Commits aplicados:"
+    git -C "$REPO" log --oneline "${ANTES}..${DEPOIS}" 2>/dev/null | sed 's/^/  /'
+
+    # Copia arquivos da aplicação para o web root
+    echo ""
+    info "Copiando arquivos da aplicação..."
+    for DIR in app bootstrap config public routes scripts; do
+        if [ -d "$REPO/$DIR" ]; then
+            cp -r "$REPO/$DIR/." "$WEB_DIR/$DIR/"
+        fi
+    done
+    ok "Arquivos copiados para $WEB_DIR"
+
+    # Copia configurações de serviços (sem sobrescrever .env e arquivos locais)
+    if [ -f "$REPO/config/dnsmasq-gwos.conf" ]; then
+        cp "$REPO/config/dnsmasq-gwos.conf" /etc/dnsmasq.d/gwos.conf
+    fi
+
+    # Ajusta permissões
+    chown -R www-data:www-data "$WEB_DIR/app" "$WEB_DIR/public" "$WEB_DIR/bootstrap" "$WEB_DIR/routes" 2>/dev/null || true
+    chmod -R 755 "$WEB_DIR/scripts" 2>/dev/null || true
+
+    # Reinicia PHP-FPM para limpar opcache
+    if systemctl is-active php8.4-fpm &>/dev/null; then
+        systemctl reload php8.4-fpm
+        ok "PHP-FPM recarregado (opcache limpo)"
+    elif systemctl is-active php8.3-fpm &>/dev/null; then
+        systemctl reload php8.3-fpm
+        ok "PHP-FPM recarregado (opcache limpo)"
+    fi
+
+    echo ""
+    ok "Atualização concluída. Versão: $DEPOIS"
 }
 
 # ==================================================================
@@ -533,6 +612,7 @@ case "$CMD" in
     backup)             cmd_backup "$@" ;;
     diag|diagnostico)   cmd_diag ;;
     dns)                cmd_dns "$@" ;;
+    update|atualizar)   cmd_update ;;
     resetsenha)         cmd_resetsenha "$@" ;;
     desbloqueio)        cmd_desbloqueio "$@" ;;
     help|--help|-h)     cmd_help ;;
