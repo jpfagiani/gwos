@@ -81,6 +81,8 @@ while IFS=$'\t' read -r id dias hora_ini hora_fim acao grupo_id; do
     fi
 done
 
-squid -k parse && squid -k reconfigure
+if [[ "${1:-}" != "--no-reconfigure" ]]; then
+    squid -k parse && squid -k reconfigure
+fi
 
 echo "ACLs de horário aplicadas com sucesso."

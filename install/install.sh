@@ -517,9 +517,16 @@ fi
 # Inicializa diretórios de cache do Squid (deve rodar após ssl_db estar pronto)
 squid -z 2>/dev/null || true
 
+# Adiciona www-data ao grupo proxy para leitura do access.log
+usermod -aG proxy www-data 2>/dev/null || true
+
 # Popula listas de domínios do banco antes de iniciar o Squid
 DB_HOST=127.0.0.1 DB_BANCO=gwos DB_USUARIO=gwos DB_SENHA="${DB_SENHA}" \
     bash "${GWOS_DIR}/scripts/gerar_squid_dominios.sh" --no-reconfigure 2>/dev/null || true
+
+# Gera regras de horário a partir dos registros iniciais do banco
+DB_HOST=127.0.0.1 DB_BANCO=gwos DB_USUARIO=gwos DB_SENHA="${DB_SENHA}" \
+    bash "${GWOS_DIR}/scripts/gerar_squid_acl.sh" --no-reconfigure 2>/dev/null || true
 
 systemctl enable --now squid
 ok "Squid configurado."
