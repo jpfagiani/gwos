@@ -138,7 +138,7 @@
         <table class="table table-hover table-sm mb-0 small">
             <thead class="table-light sticky-top">
                 <tr>
-                    <th style="width:80px">Hora</th>
+                    <th style="width:115px">Data/Hora</th>
                     <th style="width:130px">IP</th>
                     <th>Destino</th>
                     <th style="width:110px">Grupo</th>
@@ -148,37 +148,45 @@
             <tbody id="rtLog">
                 <tr><td colspan="5" class="text-center text-muted py-3">Carregando…</td></tr>
             </tbody>
+
         </table>
     </div>
 </div>
 
-<!-- Últimos Acessos (tabela existente) -->
+<!-- Últimos Acessos -->
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white fw-semibold">
-        <i class="bi bi-clock-history me-1"></i> Últimos Acessos
+    <div class="card-header bg-white fw-semibold d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-clock-history me-1"></i> Últimos Acessos</span>
+        <small class="text-muted fw-normal">25 mais recentes do log do Squid</small>
     </div>
     <div class="table-responsive">
         <table class="table table-hover mb-0 small">
             <thead class="table-light">
                 <tr>
-                    <th>Data</th>
-                    <th>IP Cliente</th>
+                    <th style="width:135px">Data/Hora</th>
+                    <th style="width:130px">IP Cliente</th>
                     <th>Domínio</th>
-                    <th class="text-end">Requisições</th>
-                    <th class="text-end">Tráfego</th>
+                    <th style="width:110px">Grupo</th>
+                    <th style="width:80px" class="text-end">Tráfego</th>
+                    <th style="width:90px">Ação</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($ultimosAcessos)): ?>
-                    <tr><td colspan="5" class="text-center text-muted py-3">Nenhum acesso registrado.</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted py-3">Nenhum acesso no log do Squid.</td></tr>
                 <?php else: ?>
                     <?php foreach ($ultimosAcessos as $a): ?>
                         <tr>
-                            <td><?= h($a['data']) ?></td>
+                            <td class="font-monospace text-muted" style="font-size:.8rem"><?= h($a['data_hora']) ?></td>
                             <td><span class="font-monospace text-primary fw-semibold"><?= h($a['ip_cliente']) ?></span></td>
-                            <td><?= h($a['dominio']) ?></td>
-                            <td class="text-end"><?= number_format($a['acessos']) ?></td>
-                            <td class="text-end"><?= formatar_bytes((int)$a['bytes']) ?></td>
+                            <td class="text-truncate" style="max-width:220px"><?= h($a['dominio']) ?></td>
+                            <td><span class="badge bg-secondary"><?= h($a['grupo']) ?></span></td>
+                            <td class="text-end font-monospace" style="font-size:.8rem"><?= formatar_bytes((int)$a['bytes']) ?></td>
+                            <td>
+                                <span class="badge bg-<?= $a['bloqueado'] ? 'danger' : 'success' ?>">
+                                    <?= $a['bloqueado'] ? 'NEGADO' : 'PERMITIDO' ?>
+                                </span>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
