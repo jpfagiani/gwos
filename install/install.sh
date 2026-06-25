@@ -151,6 +151,42 @@ done
 ok "Rede: $REDE_LAN  |  Gateway: $IP_GATEWAY"
 
 # ------------------------------------------------------------------
+# Rede secundária (alias) — roteamento entre sub-redes
+# ------------------------------------------------------------------
+titulo "── Rede Secundária / Alias (opcional) ──"
+echo ""
+echo -e "  Configura um IP secundário na LAN para rotear entre duas sub-redes."
+echo -e "  Exemplo: GWOS em 172.14.29.10 + alias 10.14.29.254 para alcançar rede 10.x"
+echo ""
+read -rp "  Configurar rede secundária? [s/N]: " REDE2_ATIVO
+REDE2_ATIVO="${REDE2_ATIVO:-N}"
+
+IP_ALIAS=""
+REDE2_MASK="255.255.255.0"
+REDE2_CIDR=""
+REDE2_PREFIX=24
+
+if [[ "$REDE2_ATIVO" =~ ^[Ss]$ ]]; then
+    read -rp "  IP do alias na rede secundária (ex: 10.14.29.254): " IP_ALIAS
+    while ! echo "$IP_ALIAS" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; do
+        echo -e "  ${RED}IP inválido. Use formato IPv4 (ex: 10.14.29.254)${NC}"
+        read -rp "  IP do alias: " IP_ALIAS
+    done
+    read -rp "  Máscara da rede secundária [255.255.255.0]: " _REDE2_MASK
+    REDE2_MASK="${_REDE2_MASK:-255.255.255.0}"
+    IFS='.' read -r _a _b _c _d <<< "$IP_ALIAS"
+    IFS='.' read -r _m1 _m2 _m3 _m4 <<< "$REDE2_MASK"
+    REDE2_PREFIX=0
+    for _oct in $_m1 $_m2 $_m3 $_m4; do
+        for _bit in 128 64 32 16 8 4 2 1; do
+            (( _oct & _bit )) && REDE2_PREFIX=$((REDE2_PREFIX+1)) || true
+        done
+    done
+    REDE2_CIDR="$(( _a & _m1 )).$(( _b & _m2 )).$(( _c & _m3 )).$(( _d & _m4 ))/${REDE2_PREFIX}"
+    ok "Alias: ${IFACE_LAN}:1  IP: ${IP_ALIAS}  Rede: ${REDE2_CIDR}"
+fi
+
+# ------------------------------------------------------------------
 # Configuração da WAN (DHCP ou estático)
 # ------------------------------------------------------------------
 titulo "── Configuração da WAN ──"
@@ -204,6 +240,9 @@ echo -e "  WAN        : ${BOLD}${IFACE_WAN}${NC}"
 echo -e "  LAN        : ${BOLD}${IFACE_LAN}${NC}"
 echo -e "  Rede LAN   : ${BOLD}${REDE_LAN}${NC}"
 echo -e "  IP Gateway : ${BOLD}${IP_GATEWAY}${NC}"
+if [[ "$REDE2_ATIVO" =~ ^[Ss]$ ]]; then
+    echo -e "  Rede 2     : ${BOLD}${REDE2_CIDR}  alias ${IFACE_LAN}:1 → ${IP_ALIAS}${NC}"
+fi
 echo ""
 read -rp "  Iniciar instalação? [S/n]: " INI; INI="${INI:-S}"
 [[ "$INI" =~ ^[Ss]$ ]] || { echo "Cancelado."; exit 0; }
@@ -299,6 +338,17 @@ iface ${IFACE_LAN} inet static
 
 NETEOF
 
+if [[ "$REDE2_ATIVO" =~ ^[Ss]$ ]]; then
+    cat >> /etc/network/interfaces << NETEOF
+# Alias secundário — roteamento para rede ${REDE2_CIDR}
+auto ${IFACE_LAN}:1
+iface ${IFACE_LAN}:1 inet static
+    address ${IP_ALIAS}
+    netmask ${REDE2_MASK}
+
+NETEOF
+fi
+
 ok "/etc/network/interfaces configurado."
 
 # Aplica a configuração sem reiniciar o serviço de rede inteiro
@@ -306,6 +356,10 @@ ok "/etc/network/interfaces configurado."
 ip addr flush dev "$IFACE_LAN" 2>/dev/null || true
 ip addr add "${IP_GATEWAY}/${LAN_PREF}" dev "$IFACE_LAN" 2>/dev/null || true
 ip link set "$IFACE_LAN" up 2>/dev/null || true
+
+if [[ "$REDE2_ATIVO" =~ ^[Ss]$ ]]; then
+    ip addr add "${IP_ALIAS}/${REDE2_PREFIX}" dev "$IFACE_LAN" 2>/dev/null || true
+fi
 
 if [ "$WAN_MODO" = "static" ]; then
     ip addr flush dev "$IFACE_WAN" 2>/dev/null || true
@@ -452,6 +506,8 @@ titulo "══ Squid ══"
 
 cp "${GWOS_DIR}/config/squid.conf" /etc/squid/squid.conf
 sed -i "s|acl localnet src 192.168.0.0/16|acl localnet src ${REDE_LAN}|" /etc/squid/squid.conf
+[[ "$REDE2_ATIVO" =~ ^[Ss]$ ]] && \
+    sed -i "/acl localnet src ${REDE_LAN}/a acl localnet src ${REDE2_CIDR}" /etc/squid/squid.conf || true
 
 mkdir -p /etc/squid/conf.d
 cp "${GWOS_DIR}/config/squid_ips_liberados.txt"  /etc/squid/conf.d/gwos_ips_liberados.txt
@@ -537,6 +593,11 @@ titulo "══ Firewall (nftables) ══"
 
 systemctl enable nftables
 
+# Regra nftables para rede secundária (vazia se não configurada)
+NFT_REDE2_RETURN=""
+[[ "$REDE2_ATIVO" =~ ^[Ss]$ ]] && \
+    NFT_REDE2_RETURN="        iif \"${IFACE_LAN}\" ip daddr ${REDE2_CIDR} return  # rede secundária"
+
 cat > /etc/sysctl.d/99-gwos.conf <<SYSCTL
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.rp_filter = 1
@@ -563,6 +624,7 @@ table ip gwos_nat {
         type nat hook prerouting priority dstnat;
         # Tráfego LAN→LAN (inclui o gateway/painel): não intercepta
         iif "${IFACE_LAN}" ip daddr ${REDE_LAN} return
+${NFT_REDE2_RETURN}
         # Proxy transparente — apenas tráfego saindo para internet
         iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat tcp dport 80 redirect to :3128
         iif "${IFACE_LAN}" ip saddr != @ip_liberados_nat tcp dport 443 redirect to :3129
@@ -708,6 +770,9 @@ echo ""
 echo -e "  Interface WAN  : ${BOLD}${IFACE_WAN}${NC}"
 echo -e "  Interface LAN  : ${BOLD}${IFACE_LAN}${NC}"
 echo -e "  Rede LAN       : ${BOLD}${REDE_LAN}${NC}"
+if [[ "$REDE2_ATIVO" =~ ^[Ss]$ ]]; then
+    echo -e "  Rede secundária: ${BOLD}${REDE2_CIDR}  (${IFACE_LAN}:1 → ${IP_ALIAS})${NC}"
+fi
 echo ""
 echo -e "${BOLD}${CYAN}  Certificado CA (SSL Bump):${NC}"
 echo -e "  Download       : ${BOLD}http://${IP_GATEWAY}/gwos-ca.crt${NC}"

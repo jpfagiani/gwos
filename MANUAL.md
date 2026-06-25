@@ -32,11 +32,31 @@ bash install.sh
 O instalador pergunta:
 - Interface WAN (saída para internet)
 - Interface LAN (rede interna)
-- IP do gateway (ex: 172.14.29.1)
+- IP do gateway (ex: 172.14.29.10)
 - Rede LAN (ex: 172.14.29.0/24)
-- Senha do banco de dados
+- **Rede secundária (opcional):** IP alias na LAN para rotear entre duas sub-redes  
+  Exemplo: GWOS em `172.14.29.10` + alias `10.14.29.254` para alcançar rede `10.14.29.0/24`
+- Configuração da WAN (DHCP ou IP estático)
 
 Ao final, exibe a URL de acesso, login e senha padrão.
+
+### Rede secundária — quando usar
+
+Configure quando o GWOS precisa ser gateway para duas redes diferentes conectadas via switches:
+
+```
+Internet → Switch 10.x → cabo → Switch 172.x → GWOS (172.14.29.10)
+```
+
+O instalador cria automaticamente:
+- Interface alias `LAN:1` com o IP secundário (ex: `10.14.29.254`)
+- Regra nftables para não interceptar tráfego entre as redes
+- ACL do Squid para a rede secundária
+
+Nos PCs da rede `10.x`, adicionar rota estática (cmd como admin):
+```cmd
+route add 172.14.29.0 MASK 255.255.255.0 10.14.29.254 -p
+```
 
 > Após a instalação, acesse o painel e **troque a senha** no primeiro login.
 
