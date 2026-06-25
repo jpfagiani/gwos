@@ -1,549 +1,373 @@
 # GWOS — Manual de Instalação e Uso
 
-**Gateway Web OS** — Firewall DNS + Proxy com controle de acesso por grupos de IPs.
+**Gateway Web OS** — Firewall, DNS, Proxy Squid com controle de acesso por grupos de IPs.
+
+- **IP padrão:** 172.14.29.1
+- **Painel web:** `http://172.14.29.1` (redireciona para HTTPS)
+- **Login padrão:** `admin@gwos.local` / `gwos@2025`
 
 ---
 
-## Índice
-
-1. [Requisitos](#1-requisitos)
-2. [Instalação](#2-instalação)
-3. [Acesso ao Painel](#3-acesso-ao-painel)
-4. [Configuração Inicial](#4-configuração-inicial)
-5. [Configurar Clientes](#5-configurar-clientes)
-6. [Uso Diário — Painel Web](#6-uso-diário--painel-web)
-7. [Uso Diário — CLI](#7-uso-diário--cli)
-8. [Grupos de Acesso](#8-grupos-de-acesso)
-9. [Horários Liberados](#9-horários-liberados)
-10. [DNS Interno](#10-dns-interno)
-11. [NAT 1:1](#11-nat-11)
-12. [Manutenção](#12-manutenção)
-13. [Solução de Problemas](#13-solução-de-problemas)
-
----
-
-## 1. Requisitos
-
-### Hardware mínimo
-| Recurso | Mínimo |
-|---------|--------|
-| CPU | 2 cores |
-| RAM | 2 GB |
-| Disco | 20 GB |
-| Interfaces de rede | 2 (LAN + WAN) |
-
-### Sistema operacional
-- **Debian 13** (Trixie) — recomendado
-- Debian 12 (Bookworm) — compatível
+## 1. Instalação do Zero
 
 ### Pré-requisitos
-- Acesso root ao servidor
-- Interfaces de rede identificadas (ex: `eth0` = WAN, `eth1` = LAN)
-- IP fixo na interface LAN (ex: `192.168.0.1/24`)
-- Conexão com a internet na WAN
+
+- Debian 12 ou 13 (instalação mínima)
+- Duas interfaces de rede: uma para a LAN, uma para a WAN (internet)
+- Acesso root
+- Conexão com a internet
+
+### Passo a Passo
+
+```bash
+# 1. Instalar git e clonar o repositório
+apt install -y git
+git clone https://github.com/jpfagiani/gwos.git /opt/gwos
+cd /opt/gwos/install
+
+# 2. Executar o instalador
+bash install.sh
+```
+
+O instalador pergunta:
+- Interface WAN (saída para internet)
+- Interface LAN (rede interna)
+- IP do gateway (ex: 172.14.29.1)
+- Rede LAN (ex: 172.14.29.0/24)
+- Senha do banco de dados
+
+Ao final, exibe a URL de acesso, login e senha padrão.
+
+> Após a instalação, acesse o painel e **troque a senha** no primeiro login.
 
 ---
 
-## 2. Instalação
-
-### 2.1 Clone o repositório
+## 2. Atualizar sem Reinstalar
 
 ```bash
-apt update && apt install -y git
-git clone https://github.com/jpfagiani/gwos /opt/gwos
-cd /opt/gwos
+gwos update
 ```
 
-### 2.2 Execute o instalador
+Faz `git pull` e copia os arquivos para o servidor web sem tocar em configurações.
+
+---
+
+## 3. Painel Web
+
+### Acesso
+
+- **URL:** `http://IP_DO_GATEWAY`
+- **E-mail:** `admin@gwos.local`
+- **Senha padrão:** `gwos@2025`
+
+### Seções do painel
+
+| Seção | Função |
+|-------|--------|
+| Dashboard | Acessos em tempo real, últimos 25 acessos, gráfico de banda, status dos serviços |
+| Grupos | Criar e gerenciar grupos de IPs (Liberados, Parciais, Bloqueados) |
+| IPs | Associar endereços IP a grupos |
+| Domínios | Blacklist e whitelist de domínios/sites |
+| Horários | Regras de liberação por dia/hora (horário livre, almoço, etc.) |
+| NAT 1:1 | Redirecionamento de portas externas para IPs internos |
+| DNS | Adicionar nomes internos (ex: `samba.cdpni.local → 172.14.29.11`) |
+| Relatórios | Histórico de acessos por IP/domínio |
+| Configurações | Parâmetros do sistema |
+
+---
+
+## 4. Grupos de IPs e Política de Acesso
+
+Cada IP da rede deve ser cadastrado em um grupo para ter acesso à internet.
+
+| Grupo | Comportamento |
+|-------|---------------|
+| **Liberados** | Acesso irrestrito à internet |
+| **Parciais** | Acesso com restrições: blacklist de domínios e horários aplicados |
+| **Bloqueados** | Apenas whitelist (sites obrigatórios/governo) |
+| *(sem grupo)* | Bloqueado — nenhum acesso |
+
+### Adicionar um IP
+
+1. Painel → **Grupos** → selecione o grupo desejado
+2. Clique em **Adicionar IP**
+3. Informe o endereço IP e descrição
+
+---
+
+## 5. Blacklist e Whitelist de Domínios
+
+### Blacklist (bloquear sites)
+
+Painel → **Domínios** → **Blacklist** → Adicionar domínio
+
+Depois clique em **Aplicar** para atualizar o Squid e o DNS (BIND9 RPZ).
+
+Exemplos:
+```
+facebook.com
+youtube.com
+tiktok.com
+```
+
+### Whitelist (liberar sempre, mesmo para Bloqueados)
+
+Painel → **Domínios** → **Whitelist** → Adicionar domínio
+
+Usado para sites de governo, sistemas obrigatórios, etc. IPs do grupo Bloqueados conseguem acessar apenas esses sites.
+
+### Aplicar mudanças no Squid
+
+Após adicionar/remover domínios, clique em **Aplicar** no painel.  
+Ou via terminal:
 
 ```bash
-bash install/install.sh
-```
-
-O instalador irá perguntar:
-
-| Pergunta | Exemplo |
-|----------|---------|
-| Interface WAN | `eth0` |
-| Interface LAN | `eth1` |
-| Rede LAN (CIDR) | `192.168.0.0/24` |
-| IP do gateway (LAN) | `192.168.0.1` |
-| Senha do banco de dados | (escolha uma senha forte) |
-| Senha do admin do painel | (escolha uma senha forte) |
-
-### 2.3 O que o instalador faz automaticamente
-
-- Instala: Squid 6, BIND9, nginx, PHP 8.4-FPM, MariaDB, nftables
-- Configura o banco de dados `gwos` com schema e dados iniciais
-- Gera o certificado CA do GWOS para SSL Bump
-- Configura o proxy transparente (portas 3128/3129) e explícito (porta 3127)
-- Ativa o firewall nftables com NAT e redirecionamento de tráfego
-- Cria o comando `gwos` disponível globalmente
-- Exibe ao final o endereço para baixar o certificado CA
-
-### 2.4 Ao final da instalação
-
-O instalador exibe um resumo como:
-
-```
-========================================
-  GWOS instalado com sucesso!
-========================================
-  Painel:     http://192.168.0.1
-  Login:      admin@gwos.local
-  Senha:      (a senha que você definiu)
-  CA cert:    http://192.168.0.1/gwos-ca.crt
-========================================
+sudo /opt/gwos/scripts/gerar_squid_dominios.sh
 ```
 
 ---
 
-## 3. Acesso ao Painel
+## 6. Horários (Horário Livre)
 
-Abra o browser em qualquer máquina da LAN e acesse:
+Permite que IPs do grupo **Parciais** acessem sites da blacklist em horários determinados.
 
-```
-http://192.168.0.1
-```
+### Criar uma regra de horário livre
 
-Use as credenciais definidas durante a instalação.
+1. Painel → **Horários** → **Nova Regra**
+2. Nome: ex. `Livre almoço`
+3. Ação: `Permitir`
+4. Horário: `11:00` até `13:00`
+5. Dias: Seg a Sex
+6. Grupo: deixar em branco (aplica a todos os Parciais)
+7. Salvar → o Squid é atualizado automaticamente
 
----
+### Horários padrão (pré-configurados na instalação)
 
-## 4. Configuração Inicial
+| Nome | Horário | Dias |
+|------|---------|------|
+| Livre almoço (seg-sex) | 11:00–13:00 | Seg–Sex |
+| Livre sábado | 08:00–17:00 | Sábado |
+| Livre domingo | 08:00–17:00 | Domingo |
 
-### 4.1 Gerar listas de domínios
-
-Após a instalação, gere as listas de domínios bloqueados/whitelist:
-
-```bash
-sudo bash /opt/gwos/scripts/gerar_squid_dominios.sh
-```
-
-### 4.2 Gerar ACLs de horários
-
-```bash
-sudo bash /opt/gwos/scripts/gerar_squid_acl.sh
-```
-
-### 4.3 Aplicar regras
+### Forçar atualização das regras no Squid
 
 ```bash
-sudo bash /opt/gwos/scripts/aplicar_nftables.sh
-```
-
-Ou use o comando `gwos`:
-
-```bash
-gwos reload
+sudo /opt/gwos/scripts/gerar_squid_acl.sh
 ```
 
 ---
 
-## 5. Configurar Clientes
+## 7. NAT 1:1 (Redirecionamento de Portas)
 
-### 5.1 Instalar o Certificado CA (obrigatório para HTTPS)
+Painel → **NAT** → **Adicionar**
 
-O certificado é necessário para que o Squid possa inspecionar tráfego HTTPS sem erros no browser.
+Exemplo: redirecionar porta 8080 da internet para o servidor Samba (porta 80):
+- IP externo: `0.0.0.0` (qualquer)
+- Porta externa: `8080`
+- IP interno: `172.14.29.11`
+- Porta interna: `80`
 
-**Windows:**
-1. Acesse `http://192.168.0.1/gwos-ca.crt` no browser do cliente
-2. Clique em "Abrir" no arquivo baixado
-3. Clique em "Instalar Certificado"
-4. Selecione "Computador Local" → Avançar
-5. Selecione "Colocar todos os certificados no repositório a seguir"
-6. Clique em "Procurar" → selecione **"Autoridades de Certificação Raiz Confiáveis"**
-7. OK → Avançar → Concluir
-8. Reinicie o browser
-
-**Linux:**
-```bash
-wget http://192.168.0.1/gwos-ca.crt -O /usr/local/share/ca-certificates/gwos-ca.crt
-update-ca-certificates
-```
-
-### 5.2 Configurar DNS
-
-Configure os clientes para usar o gateway como DNS:
-- **DNS primário:** `192.168.0.1`
-- **DNS secundário:** `8.8.8.8` (fallback)
-
-### 5.3 Proxy (opcional — modo explícito)
-
-Se precisar de NAT 1:1 ou preferir proxy explícito:
-- **Servidor proxy:** `192.168.0.1`
-- **Porta:** `3127`
-
-Se não configurar proxy no cliente, o tráfego é interceptado automaticamente (proxy transparente) via nftables — portas 80 e 443.
+Ativar a regra após criar.
 
 ---
 
-## 6. Uso Diário — Painel Web
+## 8. DNS Interno
 
-### 6.1 Dashboard
+Permite acessar servidores internos por nome em vez de IP.
 
-Exibe resumo do sistema:
-- Grupos ativos, IPs gerenciados, domínios, regras NAT
-- Últimos acessos registrados (IP, domínio, requisições, tráfego)
-- Status dos serviços (Squid, BIND9, nftables, nginx, MariaDB)
-
-### 6.2 Grupos & IPs
-
-Gerencia quem pode acessar o quê.
-
-**Criar um grupo:**
-1. Clique em **+ Novo Grupo**
-2. Defina nome e tipo:
-   - `bloqueado` — só acessa whitelist e sites do governo
-   - `parcial` — acessa internet, exceto streaming/redes sociais (liberados nos horários)
-   - `liberado` — acesso total à internet
-
-**Adicionar IPs ao grupo:**
-1. Clique no botão de IPs do grupo (ícone com número)
-2. Digite o IP ou faixa CIDR (ex: `192.168.0.20` ou `192.168.0.0/24`)
-3. Clique **+ Adicionar**
-
-**Aplicar as regras após modificar IPs:**
-1. Clique em **▶ Aplicar nftables** na página de Grupos
-
-> Isso atualiza automaticamente os arquivos do Squid e as regras do nftables.
-
-### 6.3 Domínios
-
-Gerencia listas de domínios:
-- **whitelist** — sempre acessível para todos
-- **blacklist** — bloqueado para parciais (exceto nos horários liberados)
-- **sites_livres** — acessível para todos sem restrição
-
-**Adicionar domínio:**
-1. Acesse **Domínios** no menu
-2. Clique em **+ Novo Domínio**
-3. Informe o domínio e categoria
-4. Clique em **Salvar**
-
-Após adicionar domínios, regenere as listas:
 ```bash
-gwos reload
+# Adicionar
+gwos dns add samba 172.14.29.11
+
+# Listar
+gwos dns list
+
+# Atualizar IP
+gwos dns update samba 172.14.29.12
+
+# Remover
+gwos dns del samba
 ```
 
-### 6.4 Horários
+Os nomes ficam disponíveis no domínio `.cdpni.local`:
+- `samba.cdpni.local → 172.14.29.11`
 
-Define períodos em que a blacklist é ignorada para o grupo `parcial`.
-
-**Horários padrão (seg-sex):**
-| Período | Horário |
-|---------|---------|
-| Manhã cedo | 07:00 – 08:00 |
-| Almoço | 11:00 – 13:00 |
-| Fim de expediente | 17:00 – 18:00 |
-| Noite | 19:00 – 23:00 |
-
-Sábado e domingo: dia inteiro liberado.
-
-### 6.5 NAT 1:1
-
-Associa um IP externo fixo a um IP interno (útil para sistemas que exigem IP de saída específico).
-
-1. Acesse **NAT 1:1** no menu
-2. Clique em **+ Nova Regra**
-3. Informe IP interno (cliente) e IP externo (saída)
-4. Aplique via **▶ Aplicar nftables**
-
-### 6.6 Relatórios
-
-Exibe histórico de acessos filtrado por data, com paginação.
-
-### 6.7 Configurações
-
-Permite alterar parâmetros gerais como nome do sistema, interfaces de rede, portas, etc.
+Propagação em até 60 segundos.
 
 ---
 
-## 7. Uso Diário — CLI
+## 9. Comando `gwos` (CLI)
 
-O comando `gwos` está disponível para o usuário root:
+Ferramenta de administração via terminal. Disponível após a instalação.
 
 ```bash
-gwos <comando>
+gwos <comando> [opções]
 ```
+
+### Referência rápida
 
 | Comando | Descrição |
 |---------|-----------|
-| `gwos status` | Exibe status de todos os serviços |
-| `gwos reload` | Regenera ACLs, domínios e aplica nftables |
-| `gwos nat` | Reaplica apenas as regras NAT/nftables |
-| `gwos grupo list` | Lista grupos e IPs |
-| `gwos dominio list` | Lista domínios cadastrados |
-| `gwos log` | Exibe últimas linhas do log do Squid |
-| `gwos backup` | Gera backup do banco de dados |
+| `gwos status` | Status de todos os serviços |
+| `gwos reload all` | Recarrega todos os serviços |
+| `gwos reload squid` | Recarrega só o Squid |
+| `gwos reload nginx` | Recarrega só o Nginx |
 | `gwos diag` | Diagnóstico completo do sistema |
+| `gwos update` | Atualiza o código via git |
+| `gwos log tail [N]` | Últimas N linhas do log do Squid (padrão: 50) |
+| `gwos log live` | Monitorar acessos em tempo real |
+| `gwos log top [N]` | Top domínios acessados hoje |
+| `gwos log erros` | Acessos negados recentes |
+| `gwos nat list` | Listar regras NAT |
+| `gwos nat add <ext> <int>` | Adicionar regra NAT |
+| `gwos nat ativar <id>` | Ativar regra NAT |
+| `gwos nat desativar <id>` | Desativar regra NAT |
+| `gwos grupo list` | Listar grupos de IP |
+| `gwos grupo ips <id>` | Ver IPs de um grupo |
+| `gwos grupo add-ip <id> <ip>` | Adicionar IP ao grupo |
+| `gwos dominio list` | Listar domínios |
+| `gwos dominio add <dom> blacklist` | Adicionar à blacklist |
+| `gwos dominio del <dom>` | Remover domínio |
+| `gwos dns list` | Listar hosts DNS internos |
+| `gwos dns add <host> <ip>` | Adicionar host DNS |
+| `gwos dns del <host>` | Remover host DNS |
+| `gwos backup criar` | Criar backup agora |
+| `gwos backup listar` | Listar backups disponíveis |
+| `gwos backup restaurar <arquivo>` | Restaurar backup |
 
-**Exemplos:**
+### Gerenciar senha do painel
 
 ```bash
-# Ver status dos serviços
+# Resetar para gwos@2025 (padrão)
+gwos senha
+
+# Resetar para senha personalizada
+gwos senha admin@gwos.local minhaSenha123
+
+# Listar admins cadastrados
+gwos senha listar
+
+# Desbloquear conta bloqueada por tentativas excessivas
+gwos desbloqueio admin@gwos.local
+```
+
+---
+
+## 10. Serviços do Sistema
+
+| Serviço | Função |
+|---------|--------|
+| `nginx` | Servidor web (painel PHP) |
+| `php8.4-fpm` | PHP para o painel |
+| `squid` | Proxy HTTP/HTTPS com SSL Bump |
+| `named` (BIND9) | DNS com RPZ (bloqueio por domínio) |
+| `gwos-dnsmasq` | DNS interno para `.cdpni.local` |
+| `nftables` | Firewall e NAT |
+| `mariadb` | Banco de dados do painel |
+
+```bash
+# Ver status de todos
 gwos status
 
-# Após qualquer mudança no painel, aplique:
-gwos reload
-
-# Ver últimos acessos
-gwos log
-
-# Criar backup
-gwos backup
+# Reiniciar serviço individualmente
+systemctl restart squid
+systemctl restart nginx
+systemctl restart named
 ```
 
 ---
 
-## 8. Grupos de Acesso
+## 11. SSL Bump (Inspeção HTTPS)
 
-### Como funciona
+O GWOS inspeciona tráfego HTTPS para aplicar a blacklist em conexões seguras.  
+Para evitar alertas de certificado nos navegadores dos clientes:
 
-O GWOS classifica cada IP em um grupo e aplica políticas diferentes:
-
-| Grupo | YouTube/Redes Sociais | Sites Gov | Whitelist | Internet Geral |
-|-------|----------------------|-----------|-----------|----------------|
-| **bloqueado** | ❌ | ✅ | ✅ | ❌ |
-| **parcial** | ✅ só nos horários | ✅ | ✅ | ✅ (exceto blacklist) |
-| **liberado** | ✅ | ✅ | ✅ | ✅ |
-| **sem grupo** | ❌ | ✅ | ✅ | ❌ |
-
-> IPs sem grupo recebem o mesmo tratamento que o grupo `bloqueado`.
-
-### Fluxo de aplicação
-
-```
-Adicionar IP no painel
-        ↓
-Clicar "Aplicar nftables"  (ou: gwos reload)
-        ↓
-Script atualiza arquivos Squid + regras nftables
-        ↓
-Squid recarregado automaticamente
-```
+1. Baixe o certificado CA: `http://IP_GATEWAY/gwos-ca.crt`
+2. Instale como "Autoridade Certificadora Confiável" no navegador ou no Windows
 
 ---
 
-## 9. Horários Liberados
-
-Os horários são gerados automaticamente a partir do banco de dados.
-
-**Para adicionar ou modificar horários:**
-1. Acesse **Horários** no painel
-2. Crie ou edite os períodos
-3. Execute no servidor:
-```bash
-sudo bash /opt/gwos/scripts/gerar_squid_acl.sh
-squid -k reconfigure
-```
-
-Ou simplesmente:
-```bash
-gwos reload
-```
-
----
-
-## 10. DNS Interno
-
-O GWOS usa BIND9 como resolvedor DNS local com:
-- **RPZ (Response Policy Zone)** para bloquear domínios da blacklist no nível DNS
-- **Forward zones** para domínios internos do governo
-
-### Domínios internos pré-configurados
-
-| Domínio | DNS interno |
-|---------|-------------|
-| `cartoriosap.sp.gov.br` | `10.1.6.222` |
-| `prodesp.sp.gov.br` | `10.1.6.222` |
-| `policiapenal.sp.gov.br` | `10.14.8.20` |
-
-Para adicionar novos domínios internos, edite `/etc/bind/named.conf.local`:
-
-```bind
-zone "exemplo.sp.gov.br" {
-    type forward;
-    forward only;
-    forwarders { 10.x.x.x; };
-};
-```
-
-Depois recarregue:
-```bash
-rndc reload
-rndc flush
-```
-
----
-
-## 11. NAT 1:1
-
-Permite que um cliente interno saia sempre com um IP externo específico.
-
-**Pré-requisito:** o IP externo deve estar configurado na interface WAN do servidor.
-
-**Adicionar via painel:**
-1. Menu **NAT 1:1** → **+ Nova Regra**
-2. IP Interno: `192.168.0.50`
-3. IP Externo: `203.0.113.10`
-4. Salvar → **▶ Aplicar nftables**
-
----
-
-## 12. Manutenção
-
-### Atualizar o GWOS
+## 12. Logs e Diagnóstico
 
 ```bash
-cd /opt/gwos
-git pull
-# Atualizar squid.conf se necessário:
-cp config/squid.conf /etc/squid/squid.conf
-squid -k parse && systemctl restart squid
-gwos reload
-```
+# Diagnóstico completo
+gwos diag
 
-### Backup manual
+# Acessos em tempo real
+gwos log live
 
-```bash
-gwos backup
-# Arquivo salvo em /opt/gwos/backups/
-```
+# Últimos 100 acessos
+gwos log tail 100
 
-### Restaurar backup
+# Top 20 domínios hoje
+gwos log top 20
 
-```bash
-sudo bash /opt/gwos/scripts/restaurar_backup.sh /opt/gwos/backups/gwos_YYYYMMDD.sql.gz
-```
+# Só bloqueados
+gwos log erros
 
-### Verificar logs
-
-```bash
-# Log do Squid (acessos)
+# Log bruto do Squid
 tail -f /var/log/squid/access.log
 
-# Log do nginx (erros do painel)
-tail -f /var/log/nginx/error.log
+# Log do Nginx
+tail -50 /var/log/nginx/error.log
 
-# Log do BIND9
-journalctl -u named --no-pager -n 50
-```
-
-### Reiniciar serviços
-
-```bash
-systemctl restart squid
-systemctl restart named
-systemctl restart nginx
-systemctl restart php8.4-fpm
-nft -f /etc/nftables.conf   # reaplicar regras nftables
+# Log do PHP
+tail -50 /var/log/php8.4-fpm.log
 ```
 
 ---
 
-## 13. Solução de Problemas
+## 13. Problemas Comuns
 
-### Painel não abre (ERR_CONNECTION_REFUSED)
+### Painel não abre / ERR_CONNECTION_REFUSED
 
 ```bash
 systemctl status nginx
 systemctl status php8.4-fpm
-# Verifique se nftables está redirecionando a porta 80 para o Squid
-nft list ruleset | grep "dport 80"
+gwos status
 ```
 
-### Painel abre mas dá erro 500
+### "Sem registros recentes" no dashboard
+
+www-data precisa estar no grupo `proxy` para ler o log do Squid:
 
 ```bash
-tail -20 /var/log/nginx/error.log
+usermod -aG proxy www-data
+systemctl restart php8.4-fpm
 ```
 
-### Clientes sem internet
+### Site bloqueado fora do horário incorreto
+
+Verificar se as regras de horário foram geradas:
 
 ```bash
-# 1. Verificar se Squid está rodando
-systemctl status squid
-ss -tlnp | grep squid   # deve mostrar 3127, 3128, 3129
+cat /etc/squid/conf.d/gwos_horarios.conf
+```
 
-# 2. Verificar nftables
-systemctl status nftables
-nft list ruleset
+Se estiver vazio, gerar manualmente:
 
-# 3. Reaplicar tudo
-gwos reload
+```bash
+sudo /opt/gwos/scripts/gerar_squid_acl.sh
+```
+
+### DNS não resolve domínios externos
+
+```bash
+systemctl status named
+# Testar
+dig google.com @127.0.0.1
+```
+
+### Conta do painel bloqueada
+
+```bash
+gwos desbloqueio admin@gwos.local
+gwos senha
 ```
 
 ### Squid não inicia
 
 ```bash
-squid -k parse   # mostra erros de configuração
-journalctl -u squid --no-pager -n 30
+squid -k parse          # verifica erros de configuração
+journalctl -u squid -n 50
 ```
-
-### DNS não resolve domínios do governo
-
-```bash
-# Testar resolução local
-dig @127.0.0.1 new.cartoriosap.sp.gov.br
-
-# Se NXDOMAIN, limpar cache do BIND
-rndc flush
-dig @127.0.0.1 new.cartoriosap.sp.gov.br
-
-# Verificar se forward zones estão carregadas
-named-checkconf -z
-```
-
-### Site bloqueado que deveria estar liberado
-
-```bash
-# Ver o que o Squid está fazendo
-tail -f /var/log/squid/access.log | grep <ip-cliente>
-
-# Verificar horários ativos
-cat /etc/squid/conf.d/gwos_horarios.conf
-
-# Verificar se IP está no grupo correto
-gwos grupo list
-
-# Regenerar ACLs
-gwos reload
-```
-
-### Certificado CA não confiado no cliente
-
-Reinstale o certificado seguindo a seção [5.1](#51-instalar-o-certificado-ca-obrigatório-para-https).
-
----
-
-## Portas utilizadas
-
-| Porta | Protocolo | Serviço | Descrição |
-|-------|-----------|---------|-----------|
-| 53 | UDP/TCP | BIND9 | DNS |
-| 80 | TCP | nginx | Painel web |
-| 3127 | TCP | Squid | Proxy explícito (configurar nos clientes) |
-| 3128 | TCP | Squid | Proxy transparente HTTP |
-| 3129 | TCP | Squid | Proxy transparente HTTPS (SSL Bump) |
-
----
-
-## Arquivos importantes
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `/opt/gwos/.env` | Configurações do sistema (banco, interfaces) |
-| `/etc/squid/squid.conf` | Configuração do Squid |
-| `/etc/squid/conf.d/gwos_horarios.conf` | ACLs de horários (gerado automaticamente) |
-| `/etc/squid/conf.d/gwos_ips_parciais.txt` | IPs do grupo parcial |
-| `/etc/squid/conf.d/gwos_ips_bloqueados.txt` | IPs do grupo bloqueado |
-| `/etc/squid/conf.d/gwos_ips_liberados.txt` | IPs do grupo liberado |
-| `/etc/bind/named.conf.local` | Zonas DNS (forward zones) |
-| `/etc/nftables.conf` | Regras de firewall/NAT |
-| `/var/log/squid/access.log` | Log de acessos |
-| `/opt/gwos/backups/` | Backups do banco de dados |
-
----
-
-*GWOS — Gateway Web OS | github.com/jpfagiani/gwos*
