@@ -482,6 +482,8 @@ cmd_help() {
     echo "  dns del <host>               Remover host"
     echo ""
     echo -e "${B}Usuários/Senha:${N}"
+    echo "  senha [email] [nova_senha]   Redefinir senha (padrão: admin@gwos.local / gwos@2025)"
+    echo "  senha listar                 Listar todos os admins"
     echo "  resetsenha <email>           Gerar token de reset e forçar troca"
     echo "  desbloqueio <email>          Desbloquear conta após tentativas excessivas"
     echo ""
@@ -597,6 +599,49 @@ cmd_desbloqueio() {
     ok "Conta desbloqueada: ${email}"
 }
 
+cmd_senha() {
+    local email="${1:-admin@gwos.local}"
+    local nova="${2:-}"
+
+    # Lista admins se nenhum email dado
+    if [ "$email" = "listar" ]; then
+        echo ""
+        mysql gwos --table -e "SELECT id, nome, email, ativo, tentativas, bloqueado_ate FROM admins;" 2>/dev/null
+        echo ""
+        return
+    fi
+
+    # Confirma que o admin existe
+    local existe
+    existe=$(mysql gwos -sNe "SELECT COUNT(*) FROM admins WHERE email='${email}';" 2>/dev/null)
+    if [ "${existe:-0}" = "0" ]; then
+        erro "Admin não encontrado: ${email}"
+        echo "Use: gwos senha listar  — para ver os admins cadastrados"
+        exit 1
+    fi
+
+    # Se não passou nova senha, usa padrão
+    if [ -z "$nova" ]; then
+        nova="gwos@2025"
+    fi
+
+    local hash
+    hash=$(php -r "echo password_hash('${nova}', PASSWORD_BCRYPT, ['cost'=>12]);" 2>/dev/null)
+    if [ -z "$hash" ]; then
+        erro "Falha ao gerar hash (PHP disponível?)"
+        exit 1
+    fi
+
+    mysql gwos -e "UPDATE admins SET senha='${hash}', tentativas=0, bloqueado_ate=NULL, primeiro_login=1 WHERE email='${email}';" 2>/dev/null
+
+    echo ""
+    ok "Senha redefinida com sucesso!"
+    echo "  Admin : ${email}"
+    echo "  Senha : ${nova}"
+    echo "  (será solicitado troca no primeiro acesso)"
+    echo ""
+}
+
 # ==================================================================
 # DISPATCHER
 # ==================================================================
@@ -615,6 +660,7 @@ case "$CMD" in
     update|atualizar)   cmd_update ;;
     resetsenha)         cmd_resetsenha "$@" ;;
     desbloqueio)        cmd_desbloqueio "$@" ;;
+    senha)              cmd_senha "$@" ;;
     help|--help|-h)     cmd_help ;;
     *)
         erro "Comando desconhecido: $CMD"
