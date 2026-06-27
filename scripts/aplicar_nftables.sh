@@ -119,7 +119,7 @@ ${NAT_DNAT}
         iif "$IFACE_LAN" tcp dport 53 redirect
 
         # Tráfego entre redes internas: não intercepta (10.*, 172.*, 192.*)
-        iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } return
+        iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.0.0.0/8, 192.168.0.0/16 } return
 
         # Proxy transparente — apenas tráfego saindo para internet
         iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :${SQUID_PORTA}

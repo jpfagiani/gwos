@@ -97,6 +97,7 @@ class GrupoController extends Controller
         );
 
         Auditoria::registrar('adicionar_ip', 'ips', (int)$ipId, null, ['grupo_id' => $id, 'endereco' => $endereco]);
+        $this->aplicarRegras();
 
         json_resposta(['sucesso' => 'IP adicionado.', 'id' => $ipId]);
     }
@@ -111,6 +112,7 @@ class GrupoController extends Controller
 
         Database::execute('DELETE FROM ips WHERE id = ?', [$id]);
         Auditoria::registrar('remover_ip', 'ips', (int)$id, $ip, null);
+        $this->aplicarRegras();
 
         json_resposta(['sucesso' => 'IP removido.']);
     }
@@ -120,11 +122,15 @@ class GrupoController extends Controller
         Auth::exigir();
         if (!csrf_verificar()) { json_resposta(['erro' => 'Token inválido.'], 403); }
 
-        $script = config('sistema.scripts_dir', '/opt/gwos/scripts') . '/aplicar_nftables.sh';
-        shell_exec("sudo {$script} > /dev/null 2>&1 &");
-
+        $this->aplicarRegras();
         Auditoria::registrar('aplicar_nftables', 'ip_grupos', null, null, null);
 
         json_resposta(['sucesso' => 'Regras nftables reaplicadas.']);
+    }
+
+    private function aplicarRegras(): void
+    {
+        $scripts = config('sistema.scripts_dir', '/opt/gwos/scripts');
+        shell_exec("sudo {$scripts}/aplicar_nftables.sh > /dev/null 2>&1 &");
     }
 }
