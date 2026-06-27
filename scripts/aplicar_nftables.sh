@@ -118,8 +118,8 @@ ${NAT_DNAT}
         iif "$IFACE_LAN" udp dport 53 redirect
         iif "$IFACE_LAN" tcp dport 53 redirect
 
-        # Tráfego LAN→LAN (inclui o gateway): não intercepta
-        iif "$IFACE_LAN" ip daddr $(mysql_q "SELECT valor FROM configuracoes WHERE chave='rede_lan'" 2>/dev/null || echo "192.168.0.0/24") return
+        # Tráfego entre redes internas: não intercepta (10.*, 172.*, 192.*)
+        iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } return
 
         # Proxy transparente — apenas tráfego saindo para internet
         iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :${SQUID_PORTA}
