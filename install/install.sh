@@ -386,11 +386,17 @@ mysql -e "GRANT ALL PRIVILEGES ON gwos.* TO 'gwos'@'localhost';"
 mysql -e "FLUSH PRIVILEGES;"
 mysql gwos < "${GWOS_DIR}/database/schema.sql"
 
-# Gera hash correto da senha padrão (o schema.sql tem placeholder)
-ADMIN_HASH=$(php -r "echo password_hash('gwos@2025', PASSWORD_BCRYPT, ['cost' => 12]);" 2>/dev/null || true)
-if [ -n "$ADMIN_HASH" ]; then
-    mysql gwos -e "UPDATE admins SET senha='${ADMIN_HASH}' WHERE email='admin@gwos.local';"
-fi
+# Gera hash correto e atualiza via PDO (evita problema de expansão do $ do bcrypt no shell)
+php -r "
+    try {
+        \$pdo  = new PDO('mysql:host=127.0.0.1;dbname=gwos;charset=utf8mb4', 'gwos', '${DB_SENHA}');
+        \$hash = password_hash('gwos@2025', PASSWORD_BCRYPT, ['cost' => 12]);
+        \$st   = \$pdo->prepare('UPDATE admins SET senha=?, primeiro_login=1 WHERE email=?');
+        \$st->execute([\$hash, 'admin@gwos.local']);
+    } catch (Exception \$e) {
+        fwrite(STDERR, 'Aviso: nao foi possivel atualizar senha do admin: ' . \$e->getMessage() . PHP_EOL);
+    }
+" 2>&1 || true
 
 mysql gwos -e "
     UPDATE configuracoes SET valor='${IFACE_WAN}'    WHERE chave='iface_wan';

@@ -625,14 +625,25 @@ cmd_senha() {
         nova="gwos@2025"
     fi
 
-    local hash
-    hash=$(php -r "echo password_hash('${nova}', PASSWORD_BCRYPT, ['cost'=>12]);" 2>/dev/null)
-    if [ -z "$hash" ]; then
-        erro "Falha ao gerar hash (PHP disponível?)"
+    # Usa PDO para evitar problema de expansão do $ do bcrypt no shell
+    local resultado
+    resultado=$(php -r "
+        try {
+            \$pdo  = new PDO('mysql:host=${DB_HOST:-127.0.0.1};dbname=${DB_BANCO:-gwos};charset=utf8mb4',
+                             '${DB_USUARIO:-gwos}', '${DB_SENHA}');
+            \$hash = password_hash('${nova}', PASSWORD_BCRYPT, ['cost' => 12]);
+            \$st   = \$pdo->prepare('UPDATE admins SET senha=?, tentativas=0, bloqueado_ate=NULL, primeiro_login=1 WHERE email=?');
+            \$st->execute([\$hash, '${email}']);
+            echo 'ok';
+        } catch (Exception \$e) {
+            echo 'erro:' . \$e->getMessage();
+        }
+    " 2>/dev/null)
+
+    if [[ "$resultado" != "ok" ]]; then
+        erro "Falha ao atualizar senha: ${resultado#erro:}"
         exit 1
     fi
-
-    mysql gwos -e "UPDATE admins SET senha='${hash}', tentativas=0, bloqueado_ate=NULL, primeiro_login=1 WHERE email='${email}';" 2>/dev/null
 
     echo ""
     ok "Senha redefinida com sucesso!"
