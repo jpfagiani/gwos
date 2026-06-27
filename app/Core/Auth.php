@@ -116,10 +116,6 @@ class Auth
             return false;
         }
 
-        if (strlen($novaSenha) < 8) {
-            return false;
-        }
-
         $hash = password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]);
         Database::execute(
             'UPDATE admins SET senha = ?, primeiro_login = 0 WHERE id = ?',
