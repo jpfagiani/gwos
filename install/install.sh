@@ -386,17 +386,26 @@ mysql -e "GRANT ALL PRIVILEGES ON gwos.* TO 'gwos'@'localhost';"
 mysql -e "FLUSH PRIVILEGES;"
 mysql gwos < "${GWOS_DIR}/database/schema.sql"
 
-# Gera hash correto e atualiza via PDO (evita problema de expansão do $ do bcrypt no shell)
-php -r "
-    try {
-        \$pdo  = new PDO('mysql:host=127.0.0.1;dbname=gwos;charset=utf8mb4', 'gwos', '${DB_SENHA}');
-        \$hash = password_hash('gwos@2025', PASSWORD_BCRYPT, ['cost' => 12]);
-        \$st   = \$pdo->prepare('UPDATE admins SET senha=?, primeiro_login=1 WHERE email=?');
-        \$st->execute([\$hash, 'admin@gwos.local']);
-    } catch (Exception \$e) {
-        fwrite(STDERR, 'Aviso: nao foi possivel atualizar senha do admin: ' . \$e->getMessage() . PHP_EOL);
-    }
-" 2>&1 || true
+# Variáveis passadas via ambiente — evita qualquer expansão de $ ou ' no código PHP
+_GW_HOST=127.0.0.1 _GW_BANCO=gwos _GW_USER=gwos _GW_PASS="${DB_SENHA}" \
+_GW_EMAIL=admin@gwos.local _GW_NOVA=gwos@2025 \
+php << 'PHP'
+<?php
+try {
+    $pdo = new PDO(
+        "mysql:host={$_SERVER['_GW_HOST']};dbname={$_SERVER['_GW_BANCO']};charset=utf8mb4",
+        $_SERVER['_GW_USER'],
+        $_SERVER['_GW_PASS']
+    );
+    $hash = password_hash($_SERVER['_GW_NOVA'], PASSWORD_BCRYPT, ['cost' => 12]);
+    $st   = $pdo->prepare(
+        'UPDATE admins SET senha=?, primeiro_login=1 WHERE email=?'
+    );
+    $st->execute([$hash, $_SERVER['_GW_EMAIL']]);
+} catch (Exception $e) {
+    fwrite(STDERR, 'Aviso: ' . $e->getMessage() . PHP_EOL);
+}
+PHP
 
 mysql gwos -e "
     UPDATE configuracoes SET valor='${IFACE_WAN}'    WHERE chave='iface_wan';

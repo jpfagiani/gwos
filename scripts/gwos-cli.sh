@@ -625,20 +625,34 @@ cmd_senha() {
         nova="gwos@2025"
     fi
 
-    # Usa PDO para evitar problema de expansão do $ do bcrypt no shell
+    # Variáveis passadas via ambiente — evita qualquer expansão de $ ou ' no código PHP
     local resultado
-    resultado=$(php -r "
-        try {
-            \$pdo  = new PDO('mysql:host=${DB_HOST:-127.0.0.1};dbname=${DB_BANCO:-gwos};charset=utf8mb4',
-                             '${DB_USUARIO:-gwos}', '${DB_SENHA}');
-            \$hash = password_hash('${nova}', PASSWORD_BCRYPT, ['cost' => 12]);
-            \$st   = \$pdo->prepare('UPDATE admins SET senha=?, tentativas=0, bloqueado_ate=NULL, primeiro_login=1 WHERE email=?');
-            \$st->execute([\$hash, '${email}']);
-            echo 'ok';
-        } catch (Exception \$e) {
-            echo 'erro:' . \$e->getMessage();
-        }
-    " 2>/dev/null)
+    resultado=$(
+        _GW_HOST="${DB_HOST:-127.0.0.1}" \
+        _GW_BANCO="${DB_BANCO:-gwos}" \
+        _GW_USER="${DB_USUARIO:-gwos}" \
+        _GW_PASS="${DB_SENHA}" \
+        _GW_EMAIL="${email}" \
+        _GW_NOVA="${nova}" \
+        php << 'PHP'
+<?php
+try {
+    $pdo = new PDO(
+        "mysql:host={$_SERVER['_GW_HOST']};dbname={$_SERVER['_GW_BANCO']};charset=utf8mb4",
+        $_SERVER['_GW_USER'],
+        $_SERVER['_GW_PASS']
+    );
+    $hash = password_hash($_SERVER['_GW_NOVA'], PASSWORD_BCRYPT, ['cost' => 12]);
+    $st   = $pdo->prepare(
+        'UPDATE admins SET senha=?, tentativas=0, bloqueado_ate=NULL, primeiro_login=1 WHERE email=?'
+    );
+    $st->execute([$hash, $_SERVER['_GW_EMAIL']]);
+    echo 'ok';
+} catch (Exception $e) {
+    echo 'erro:' . $e->getMessage();
+}
+PHP
+    )
 
     if [[ "$resultado" != "ok" ]]; then
         erro "Falha ao atualizar senha: ${resultado#erro:}"
