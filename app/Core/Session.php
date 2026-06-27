@@ -17,7 +17,7 @@ class Session
         session_set_cookie_params([
             'lifetime' => $duracao,
             'path'     => '/',
-            'secure'   => false,
+            'secure'   => !config('app.debug', false),
             'httponly' => true,
             'samesite' => 'Lax',
         ]);

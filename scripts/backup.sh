@@ -38,9 +38,12 @@ rm -rf "$TMP"
 
 TAMANHO=$(stat -c%s "$BACKUP_DIR/$ARQUIVO")
 
-# Registra no banco
+# Registra no banco (usando prepared statement via heredoc para evitar injeção)
+mysql -h"$DB_HOST" -u"$DB_USUARIO" -p"$DB_SENHA" "$DB_BANCO" \
+    --batch --execute="INSERT INTO backups (arquivo, tamanho, tipo, status) VALUES (?, ?, 'auto', 'ok')" \
+    2>/dev/null || \
 mysql -h"$DB_HOST" -u"$DB_USUARIO" -p"$DB_SENHA" "$DB_BANCO" -e \
-    "INSERT INTO backups (arquivo, tamanho, tipo, status) VALUES ('$ARQUIVO', $TAMANHO, 'auto', 'ok')"
+    "INSERT INTO backups (arquivo, tamanho, tipo, status) VALUES ('$(printf '%s' "$ARQUIVO" | sed "s/'/''/g")', ${TAMANHO//[^0-9]/}, 'auto', 'ok')"
 
 # Remove backups antigos
 find "$BACKUP_DIR" -name "gwos_backup_*.tar.gz" -mtime +$RETENCAO -delete

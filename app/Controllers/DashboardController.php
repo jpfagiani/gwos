@@ -11,7 +11,8 @@ class DashboardController extends Controller
         Auth::exigir();
         header('Content-Type: application/json');
 
-        $iface = trim(shell_exec("ip route show default 2>/dev/null | awk '{print \$5;exit}'") ?? 'eth0');
+        $iface = preg_replace('/[^a-z0-9\-]/', '', trim(shell_exec("ip route show default 2>/dev/null | awk '{print \$5;exit}'") ?? ''));
+        if ($iface === '' || !file_exists("/sys/class/net/{$iface}")) $iface = 'eth0';
         $rx    = (int)(file_get_contents("/sys/class/net/{$iface}/statistics/rx_bytes") ?: 0);
         $tx    = (int)(file_get_contents("/sys/class/net/{$iface}/statistics/tx_bytes") ?: 0);
 

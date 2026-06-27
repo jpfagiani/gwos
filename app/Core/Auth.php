@@ -110,7 +110,13 @@ class Auth
         );
         if (!$admin) return false;
 
+        // No primeiro login não exige a senha atual (ela é a padrão e será descartada)
+        // Nos acessos seguintes, exige verificação da senha atual
         if (!$admin['primeiro_login'] && !password_verify($senhaAtual, $admin['senha'])) {
+            return false;
+        }
+
+        if (strlen($novaSenha) < 8) {
             return false;
         }
 
@@ -137,7 +143,7 @@ class Auth
         );
         if (!$admin) return null;
 
-        $token  = strtoupper(bin2hex(random_bytes(4)));
+        $token  = strtoupper(bin2hex(random_bytes(16)));
         $expira = (new \DateTime('+24 hours'))->format('Y-m-d H:i:s');
 
         Database::execute(
