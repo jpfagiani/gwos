@@ -9,74 +9,158 @@
     <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="/assets/css/bootstrap-icons.min.css">
     <style>
-        body { background: #f4f6f9; }
+        :root {
+            --gw-navy: #0e1621;
+            --gw-navy-2: #1d2a3a;
+            --gw-navy-hover: #16202e;
+            --gw-active: #1b2a3f;
+            --gw-accent: #2f81f7;
+            --gw-muted: #9fb0c3;
+            --gw-section: #54677d;
+            --gw-page: #eef2f7;
+            --gw-border: #e2e8f0;
+        }
+        body { background: var(--gw-page); }
+
+        /* ── Sidebar ─────────────────────────────────────── */
         #sidebar {
-            min-height: 100vh;
-            width: 185px;
-            background: #1a2332;
-            color: #c8d0dc;
-            position: fixed;
-            top: 0; left: 0;
-            display: flex;
-            flex-direction: column;
-            z-index: 100;
+            min-height: 100vh; width: 210px;
+            background: var(--gw-navy); color: var(--gw-muted);
+            position: fixed; top: 0; left: 0;
+            display: flex; flex-direction: column; z-index: 100;
         }
         #sidebar .logo {
-            padding: 1.25rem 1.5rem;
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #fff;
-            border-bottom: 1px solid #2d3f55;
-            letter-spacing: 1px;
+            display: flex; align-items: center; gap: .65rem;
+            padding: 1rem 1.1rem;
+            border-bottom: 1px solid var(--gw-navy-2);
         }
-        #sidebar .nav-link {
-            color: #c8d0dc;
-            padding: .55rem 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: .6rem;
-            border-radius: 0;
-            font-size: .92rem;
+        #sidebar .logo .logo-tile {
+            width: 34px; height: 34px; flex: none;
+            border-radius: 9px; background: var(--gw-accent);
+            display: flex; align-items: center; justify-content: center;
         }
-        #sidebar .nav-link:hover,
-        #sidebar .nav-link.active {
-            background: #2d3f55;
-            color: #fff;
+        #sidebar .logo .logo-nome {
+            color: #fff; font-weight: 600; font-size: 1.05rem;
+            letter-spacing: .5px; line-height: 1.15;
+        }
+        #sidebar .logo .logo-sub {
+            color: var(--gw-section); font-size: .68rem;
+            font-family: var(--bs-font-monospace);
         }
         #sidebar .nav-section {
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            color: #6b7f96;
-            padding: 1rem 1.5rem .3rem;
+            font-size: .68rem; text-transform: uppercase;
+            letter-spacing: .08em; color: var(--gw-section);
+            padding: .9rem 1.1rem .25rem;
         }
-        #content {
-            margin-left: 185px;
-            min-height: 100vh;
+        #sidebar .nav-link {
+            color: var(--gw-muted); font-size: .9rem;
+            display: flex; align-items: center; gap: .6rem;
+            padding: .5rem .8rem; margin: 1px .5rem;
+            border-radius: 8px; border-left: 3px solid transparent;
         }
+        #sidebar .nav-link:hover { background: var(--gw-navy-hover); color: #fff; }
+        #sidebar .nav-link.active {
+            background: var(--gw-active); color: #fff;
+            border-left-color: var(--gw-accent); border-radius: 0 8px 8px 0;
+        }
+        #sidebar .nav-link i { font-size: .95rem; width: 1.1rem; text-align: center; }
+        #sidebar .sair {
+            margin-top: auto; border-top: 1px solid var(--gw-navy-2);
+        }
+        #sidebar .sair .nav-link { color: #e07a7a; margin: .4rem .5rem; }
+        #sidebar .sair .nav-link:hover { background: rgba(224,122,122,.12); color: #f1a1a1; }
+
+        /* ── Conteúdo / topbar ───────────────────────────── */
+        #content { margin-left: 210px; min-height: 100vh; }
         #topbar {
-            background: #fff;
-            border-bottom: 1px solid #e3e8ef;
-            padding: .75rem 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            background: #fff; border-bottom: 1px solid var(--gw-border);
+            padding: .65rem 1.5rem;
+            display: flex; align-items: center; justify-content: space-between;
         }
+        #topbar .titulo { font-weight: 600; color: #1e293b; font-size: 1rem; }
+        #topbar .relogio {
+            font-size: .78rem; color: #475569; background: var(--gw-page);
+            border-radius: 6px; padding: .25rem .6rem;
+        }
+        #topbar .avatar {
+            width: 30px; height: 30px; border-radius: 50%;
+            background: #dbe9fe; color: #1d4ed8;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .72rem; font-weight: 600;
+        }
+        #topbar .perfil-badge {
+            font-size: .68rem; background: #ede9fe; color: #5b21b6;
+            border-radius: 5px; padding: .2rem .45rem; font-weight: 500;
+        }
+
+        /* ── Refinamento global (cards, tabelas, badges) ─── */
+        .card { border: 1px solid var(--gw-border); border-radius: 12px; }
+        .card.shadow-sm, .card.border-0 { border: 1px solid var(--gw-border) !important; box-shadow: 0 1px 2px rgba(15,23,42,.04) !important; }
+        .card-header { background: #fff !important; border-bottom: 1px solid #e9eef4; border-radius: 12px 12px 0 0 !important; }
+        .card > .table-responsive:last-child .table,
+        .card > div:last-child > .table { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; overflow: hidden; }
+
+        .table thead th {
+            font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+            color: #64748b; font-weight: 600; border-bottom-width: 1px;
+        }
+        .table-light { --bs-table-bg: #f8fafc; }
+
+        .badge { font-weight: 500; }
+        .badge.bg-success   { background: #e7f6ec !important; color: #166534 !important; }
+        .badge.bg-danger    { background: #fdebec !important; color: #991b1b !important; }
+        .badge.bg-secondary { background: #eef2f7 !important; color: #475569 !important; }
+        .badge.bg-warning   { background: #faeeda !important; color: #854f0b !important; }
+        .badge.bg-info      { background: #dbe9fe !important; color: #1d4ed8 !important; }
+        .badge.bg-primary   { background: #dbe9fe !important; color: #1d4ed8 !important; }
+        .badge.bg-dark      { background: #e2e8f0 !important; color: #334155 !important; }
+
+        .btn { border-radius: 8px; }
+        .btn-primary { background: var(--gw-accent); border-color: var(--gw-accent); }
+        .btn-primary:hover { background: #2569d3; border-color: #2569d3; }
+        .form-control, .form-select { border-radius: 8px; }
+        .alert { border-radius: 10px; }
+        .modal-content { border-radius: 14px; border: none; }
+        .text-info { color: #1d4ed8 !important; }
     </style>
 </head>
 <body>
 
+<?php
+$adminNome   = \App\Core\Auth::admin()['nome'] ?? '';
+$adminPerfil = \App\Core\Auth::admin()['perfil'] ?? '';
+$iniciais = '';
+foreach (array_slice(preg_split('/\s+/', trim($adminNome)) ?: [], 0, 2) as $parte) {
+    $iniciais .= mb_strtoupper(mb_substr($parte, 0, 1));
+}
+$hostPainel = parse_url(config('app.url', ''), PHP_URL_HOST) ?: '';
+?>
+
 <div id="sidebar">
-    <div class="logo"><i class="bi bi-shield-lock-fill me-2"></i>GWOS</div>
-    <nav class="nav flex-column pt-2">
+    <div class="logo">
+        <div class="logo-tile">
+            <svg width="21" height="21" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2 L20 5 V11 C20 16.2 16.6 19.8 12 21.5 C7.4 19.8 4 16.2 4 11 V5 Z" fill="#fff" opacity=".14"/>
+                <path d="M12 2 L20 5 V11 C20 16.2 16.6 19.8 12 21.5 C7.4 19.8 4 16.2 4 11 V5 Z" fill="none" stroke="#fff" stroke-width="1.4"/>
+                <path d="M8.4 9.1 H12.4 A2 2 0 0 1 14.4 11.1 V13.8" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+                <circle cx="8.4" cy="9.1" r="1.4" fill="#fff"/>
+                <circle cx="14.4" cy="14.2" r="1.4" fill="#fff"/>
+            </svg>
+        </div>
+        <div>
+            <div class="logo-nome">GWOS</div>
+            <?php if ($hostPainel): ?><div class="logo-sub"><?= h($hostPainel) ?></div><?php endif; ?>
+        </div>
+    </div>
+    <nav class="nav flex-column pt-1">
         <span class="nav-section">Principal</span>
         <a class="nav-link <?= ($modulo ?? '') === 'dashboard' ? 'active' : '' ?>" href="/">
             <i class="bi bi-speedometer2"></i> Dashboard
         </a>
 
-        <span class="nav-section">Controle de Acesso</span>
+        <span class="nav-section">Controle de acesso</span>
         <a class="nav-link <?= ($modulo ?? '') === 'grupos' ? 'active' : '' ?>" href="/grupos">
-            <i class="bi bi-people-fill"></i> Grupos & IPs
+            <i class="bi bi-people-fill"></i> Grupos e IPs
         </a>
         <a class="nav-link <?= ($modulo ?? '') === 'dominios' ? 'active' : '' ?>" href="/dominios">
             <i class="bi bi-globe2"></i> Domínios
@@ -100,30 +184,29 @@
             <i class="bi bi-gear-fill"></i> Configurações
         </a>
         <a class="nav-link <?= ($modulo ?? '') === 'senha' ? 'active' : '' ?>" href="/senha/trocar">
-            <i class="bi bi-key-fill"></i> Alterar Senha
+            <i class="bi bi-key-fill"></i> Alterar senha
         </a>
-        <?php if ((\App\Core\Auth::admin()['perfil'] ?? '') === 'superadmin'): ?>
+        <?php if ($adminPerfil === 'superadmin'): ?>
         <a class="nav-link" href="/senha/gerar">
-            <i class="bi bi-person-lock"></i> Reset de Senha
+            <i class="bi bi-person-lock"></i> Reset de senha
         </a>
         <?php endif; ?>
+    </nav>
+    <div class="sair">
         <a class="nav-link" href="/logout">
             <i class="bi bi-box-arrow-left"></i> Sair
         </a>
-    </nav>
+    </div>
 </div>
 
 <div id="content">
     <div id="topbar">
-        <span class="fw-semibold text-secondary"><?= h($titulo ?? '') ?></span>
-        <div class="d-flex align-items-center gap-3 text-secondary small">
-            <span id="relogioTopo" class="font-monospace text-muted"></span>
-            <i class="bi bi-person-circle"></i>
-            <?= h(\App\Core\Auth::admin()['nome'] ?? '') ?>
-            <span class="badge bg-secondary"><?= h(\App\Core\Auth::admin()['perfil'] ?? '') ?></span>
-            <a href="/logout" class="btn btn-sm btn-outline-danger" title="Sair">
-                <i class="bi bi-box-arrow-right"></i> Sair
-            </a>
+        <span class="titulo"><?= h($titulo ?? '') ?></span>
+        <div class="d-flex align-items-center gap-2">
+            <span id="relogioTopo" class="relogio font-monospace"></span>
+            <span class="avatar"><?= h($iniciais ?: '?') ?></span>
+            <span class="small text-secondary"><?= h($adminNome) ?></span>
+            <?php if ($adminPerfil): ?><span class="perfil-badge"><?= h($adminPerfil) ?></span><?php endif; ?>
         </div>
     </div>
 
@@ -150,5 +233,15 @@
 
 <script src="/assets/js/bootstrap.bundle.min.js"></script>
 <script src="/assets/js/app.js"></script>
+<script>
+(function(){
+    const dias = ['dom','seg','ter','qua','qui','sex','sáb'];
+    function tick(){
+        const n = new Date(), el = document.getElementById('relogioTopo');
+        if(el) el.textContent = n.toTimeString().slice(0,8)+' · '+dias[n.getDay()]+' '+n.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+    }
+    tick(); setInterval(tick, 1000);
+})();
+</script>
 </body>
 </html>
