@@ -184,7 +184,7 @@
                             <td class="text-end font-monospace" style="font-size:.8rem"><?= formatar_bytes((int)$a['bytes']) ?></td>
                             <td>
                                 <span class="badge bg-<?= $a['bloqueado'] ? 'danger' : 'success' ?>">
-                                    <?= $a['bloqueado'] ? 'NEGADO' : 'PERMITIDO' ?>
+                                    <?= $a['bloqueado'] ? 'Negado' : 'Permitido' ?>
                                 </span>
                             </td>
                         </tr>
@@ -195,20 +195,13 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/assets/js/chart.umd.min.js"></script>
 <script>
 (function(){
-    const dias = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    function tick(){
-        const n = new Date(), el = document.getElementById('relogioTopo');
-        if(el) el.textContent = n.toTimeString().slice(0,8)+' — '+dias[n.getDay()]+' '+n.toLocaleDateString('pt-BR');
-    }
-    tick(); setInterval(tick, 1000);
-
     const pts = 30, lbs = Array(pts).fill('');
-    const rxH = Array(pts).fill(0), txH = Array(pts).fill(0);
+    const rxL = Array(pts).fill(0), txL = Array(pts).fill(0);
     const rxW = Array(pts).fill(0), txW = Array(pts).fill(0);
-    let rxLast = 0, txLast = 0;
+    let last = null;
 
     function mkChart(id, d1, d2, c1, c2){
         return new Chart(document.getElementById(id),{
@@ -222,10 +215,17 @@
                 scales:{x:{display:false},y:{display:false,min:0}}}
         });
     }
-    const cL = mkChart('chartLAN', rxH, txH, '#0d6efd', '#198754');
-    const cW = mkChart('chartWAN', rxW, txW, '#198754', '#dc3545');
+    const cL = mkChart('chartLAN', rxL, txL, '#2f81f7', '#1d9e75');
+    const cW = mkChart('chartWAN', rxW, txW, '#1d9e75', '#e5484d');
 
     function fmt(b){ if(b>1e6) return (b/1e6).toFixed(1)+' Mbps'; if(b>1e3) return (b/1e3).toFixed(0)+' Kbps'; return b+' bps'; }
+
+    // Escapa HTML — o log do Squid contém dados controlados pelos clientes
+    // da rede (URLs); injetar sem escapar seria XSS no navegador do admin
+    function esc(s){
+        return String(s ?? '').replace(/[&<>"']/g,
+            c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
 
     function atualizar(){
         fetch('/dashboard/info').then(r=>r.json()).then(d=>{
@@ -234,26 +234,27 @@
             document.getElementById('infoDns').textContent = d.dns;
             document.getElementById('infoConn').textContent= d.conn;
 
-            if(rxLast){
-                const drx = Math.max(0, d.rx - rxLast), dtx = Math.max(0, d.tx - txLast);
-                rxH.push(drx); rxH.shift(); txH.push(dtx); txH.shift();
-                rxW.push(Math.round(drx*.6)); rxW.shift(); txW.push(Math.round(dtx*.6)); txW.shift();
-                cL.options.scales.y.max = Math.max(...rxH,...txH)*1.2||1;
+            if(last){
+                const dLanRx = Math.max(0, d.lan_rx - last.lan_rx), dLanTx = Math.max(0, d.lan_tx - last.lan_tx);
+                const dWanRx = Math.max(0, d.wan_rx - last.wan_rx), dWanTx = Math.max(0, d.wan_tx - last.wan_tx);
+                rxL.push(dLanRx); rxL.shift(); txL.push(dLanTx); txL.shift();
+                rxW.push(dWanRx); rxW.shift(); txW.push(dWanTx); txW.shift();
+                cL.options.scales.y.max = Math.max(...rxL,...txL)*1.2||1;
                 cW.options.scales.y.max = Math.max(...rxW,...txW)*1.2||1;
                 cL.update(); cW.update();
-                document.getElementById('lanLabel').textContent = '↓ '+fmt(drx)+' · ↑ '+fmt(dtx);
-                document.getElementById('wanLabel').textContent = '↓ '+fmt(Math.round(drx*.6))+' · ↑ '+fmt(Math.round(dtx*.6));
+                document.getElementById('lanLabel').textContent = '↓ '+fmt(dLanRx)+' · ↑ '+fmt(dLanTx);
+                document.getElementById('wanLabel').textContent = '↓ '+fmt(dWanRx)+' · ↑ '+fmt(dWanTx);
             }
-            rxLast = d.rx; txLast = d.tx;
+            last = { lan_rx: d.lan_rx, lan_tx: d.lan_tx, wan_rx: d.wan_rx, wan_tx: d.wan_tx };
 
             if(d.log && d.log.length){
                 document.getElementById('rtLog').innerHTML = d.log.map(r=>`
                     <tr>
-                        <td class="font-monospace">${r.hora}</td>
-                        <td class="font-monospace text-primary">${r.ip}</td>
-                        <td class="text-truncate" style="max-width:200px">${r.dominio}</td>
-                        <td><span class="badge bg-secondary">${r.grupo||'—'}</span></td>
-                        <td><span class="badge bg-${r.bloqueado?'danger':'success'}">${r.bloqueado?'NEGADO':'PERMITIDO'}</span></td>
+                        <td class="font-monospace">${esc(r.hora)}</td>
+                        <td class="font-monospace text-primary">${esc(r.ip)}</td>
+                        <td class="text-truncate" style="max-width:200px">${esc(r.dominio)}</td>
+                        <td><span class="badge bg-secondary">${esc(r.grupo||'—')}</span></td>
+                        <td><span class="badge bg-${r.bloqueado?'danger':'success'}">${r.bloqueado?'Negado':'Permitido'}</span></td>
                     </tr>`).join('');
             } else {
                 document.getElementById('rtLog').innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sem registros recentes</td></tr>';

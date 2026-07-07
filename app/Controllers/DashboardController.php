@@ -11,21 +11,38 @@ class DashboardController extends Controller
         Auth::exigir();
         header('Content-Type: application/json');
 
-        $iface = preg_replace('/[^a-z0-9\-]/', '', trim(shell_exec("ip route show default 2>/dev/null | awk '{print \$5;exit}'") ?? ''));
-        if ($iface === '' || !file_exists("/sys/class/net/{$iface}")) $iface = 'eth0';
-        $rx    = (int)(file_get_contents("/sys/class/net/{$iface}/statistics/rx_bytes") ?: 0);
-        $tx    = (int)(file_get_contents("/sys/class/net/{$iface}/statistics/tx_bytes") ?: 0);
+        // Contadores reais das DUAS interfaces (antes só a WAN era lida e a
+        // "LAN" do gráfico era inventada multiplicando por 0.6)
+        $ifaceWan = (string) (Database::valor("SELECT valor FROM configuracoes WHERE chave = 'iface_wan'") ?? '');
+        $ifaceLan = (string) (Database::valor("SELECT valor FROM configuracoes WHERE chave = 'iface_lan'") ?? '');
+        if ($ifaceWan === '') {
+            $ifaceWan = trim(shell_exec("ip route show default 2>/dev/null | awk '{print \$5;exit}'") ?? '');
+        }
+        [$wanRx, $wanTx] = self::contadores($ifaceWan);
+        [$lanRx, $lanTx] = self::contadores($ifaceLan);
 
         echo json_encode([
-            'ip'   => trim(shell_exec("ip route get 1 2>/dev/null | awk '{print \$7;exit}'") ?? '') ?: '—',
-            'gw'   => trim(shell_exec("ip route show default 2>/dev/null | awk '{print \$3;exit}'") ?? '') ?: '—',
-            'dns'  => trim(shell_exec("awk '/^nameserver/{print \$2;exit}' /etc/resolv.conf 2>/dev/null") ?? '') ?: '—',
-            'rx'   => $rx,
-            'tx'   => $tx,
-            'conn' => (int)(Database::valor('SELECT COUNT(DISTINCT ip_cliente) FROM relatorio_diario WHERE data = CURDATE()') ?? 0),
-            'log'  => self::lerLogSquid(100),
+            'ip'     => trim(shell_exec("ip route get 1 2>/dev/null | awk '{print \$7;exit}'") ?? '') ?: '—',
+            'gw'     => trim(shell_exec("ip route show default 2>/dev/null | awk '{print \$3;exit}'") ?? '') ?: '—',
+            'dns'    => trim(shell_exec("awk '/^nameserver/{print \$2;exit}' /etc/resolv.conf 2>/dev/null") ?? '') ?: '—',
+            'lan_rx' => $lanRx,
+            'lan_tx' => $lanTx,
+            'wan_rx' => $wanRx,
+            'wan_tx' => $wanTx,
+            'conn'   => (int)(Database::valor('SELECT COUNT(DISTINCT ip_cliente) FROM relatorio_diario WHERE data = CURDATE()') ?? 0),
+            'log'    => self::lerLogSquid(100),
         ]);
         exit;
+    }
+
+    private static function contadores(string $iface): array
+    {
+        $iface = preg_replace('/[^a-zA-Z0-9\-_.]/', '', trim($iface));
+        if ($iface === '' || !file_exists("/sys/class/net/{$iface}")) return [0, 0];
+        return [
+            (int)(@file_get_contents("/sys/class/net/{$iface}/statistics/rx_bytes") ?: 0),
+            (int)(@file_get_contents("/sys/class/net/{$iface}/statistics/tx_bytes") ?: 0),
+        ];
     }
 
     private static function grupoMap(): array
