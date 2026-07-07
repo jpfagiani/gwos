@@ -25,6 +25,7 @@ mysql_q() {
 # ------------------------------------------------------------------
 IFACE_WAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_wan'")
 IFACE_LAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_lan'")
+REDE_LAN=$(mysql_q  "SELECT valor FROM configuracoes WHERE chave='rede_lan'")
 NAT_ATIVO=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='nat_ativo'")
 SQUID_PORTA=$(mysql_q  "SELECT valor FROM configuracoes WHERE chave='squid_porta'")
 SQUID_PORTA="${SQUID_PORTA:-3128}"
@@ -83,6 +84,12 @@ else
     MASQ="        # masquerade desativado"
 fi
 
+# A rede LAN configurada pode estar FORA das faixas RFC 1918
+# (ex.: 172.14.29.0/24) — precisa de regra própria de return.
+RETURN_REDE_LAN="        # rede_lan não configurada no banco"
+[ -n "$REDE_LAN" ] && \
+    RETURN_REDE_LAN="        iif \"$IFACE_LAN\" ip daddr $REDE_LAN return"
+
 # ------------------------------------------------------------------
 # Elementos dos sets (evita bloco vazio que pode falhar no nft)
 # ------------------------------------------------------------------
@@ -118,8 +125,11 @@ ${NAT_DNAT}
         iif "$IFACE_LAN" udp dport 53 redirect
         iif "$IFACE_LAN" tcp dport 53 redirect
 
-        # Tráfego entre redes internas: não intercepta (10.*, 172.*, 192.*)
-        iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.0.0.0/8, 192.168.0.0/16 } return
+        # Tráfego para a própria LAN (inclui gateway/painel): não intercepta
+${RETURN_REDE_LAN}
+
+        # Tráfego entre redes internas: não intercepta (faixas privadas RFC 1918)
+        iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } return
 
         # Proxy transparente — apenas tráfego saindo para internet
         iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :${SQUID_PORTA}

@@ -9,7 +9,9 @@ HOSTS_FILE="/etc/hosts"
 MARKER="# gwos-dns"   # identifica linhas gerenciadas pelo GWOS
 
 _reload() {
-    systemctl reload dnsmasq
+    # O serviço instalado pelo GWOS é gwos-dnsmasq (o dnsmasq padrão fica desativado)
+    systemctl reload gwos-dnsmasq 2>/dev/null \
+        || systemctl restart gwos-dnsmasq
 }
 
 cmd_list() {

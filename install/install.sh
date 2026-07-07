@@ -467,7 +467,8 @@ cp "${GWOS_DIR}/config/db.rpz.gwos"        /etc/bind/db.rpz.gwos
 chown bind:bind /etc/bind/named.conf.options /etc/bind/named.conf.local \
                 /etc/bind/db.rpz.gwos
 
-sed -i "s|192\.168\.1\.1;|${IP_GATEWAY};|g" /etc/bind/named.conf.options
+# named.conf.options usa "localnets" — não depende do IP do gateway,
+# portanto sobrevive a trocas de IP sem precisar de edição.
 
 mkdir -p /var/log/named
 chown bind:bind /var/log/named
@@ -520,9 +521,14 @@ titulo "══ Squid ══"
 # ==================================================================
 
 cp "${GWOS_DIR}/config/squid.conf" /etc/squid/squid.conf
-sed -i "s|acl localnet src 192.168.0.0/16|acl localnet src ${REDE_LAN}|" /etc/squid/squid.conf
-[[ "$REDE2_ATIVO" =~ ^[Ss]$ ]] && \
-    sed -i "/acl localnet src ${REDE_LAN}/a acl localnet src ${REDE2_CIDR}" /etc/squid/squid.conf || true
+# Adiciona a rede LAN às ACLs (sem remover as faixas RFC 1918 do template).
+# Importante: a rede pode estar FORA das faixas privadas (ex.: 172.14.29.0/24).
+sed -i "/acl localnet src 192.168.0.0\/16/a acl localnet src ${REDE_LAN}"       /etc/squid/squid.conf
+sed -i "/acl rede_interna dst 192.168.0.0\/16/a acl rede_interna dst ${REDE_LAN}" /etc/squid/squid.conf
+if [[ "$REDE2_ATIVO" =~ ^[Ss]$ ]]; then
+    sed -i "/acl localnet src ${REDE_LAN//\//\\/}/a acl localnet src ${REDE2_CIDR}"       /etc/squid/squid.conf
+    sed -i "/acl rede_interna dst ${REDE_LAN//\//\\/}/a acl rede_interna dst ${REDE2_CIDR}" /etc/squid/squid.conf
+fi
 
 mkdir -p /etc/squid/conf.d
 cp "${GWOS_DIR}/config/squid_ips_liberados.txt"  /etc/squid/conf.d/gwos_ips_liberados.txt

@@ -56,7 +56,10 @@ table ip gwos_nat {
         type nat hook prerouting priority dstnat;
 
         # Tráfego LAN→LAN e para o próprio gateway: não intercepta
+        # (rede configurada — pode estar fora das faixas RFC 1918, ex.: 172.14.x)
         iif "$IFACE_LAN" ip daddr $REDE_LAN return
+        # Faixas privadas RFC 1918
+        iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } return
 
         # Força DNS pelo BIND9 local
         iif "$IFACE_LAN" udp dport 53 redirect

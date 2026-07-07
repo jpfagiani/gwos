@@ -383,6 +383,14 @@ cmd_dns() {
 }
 
 # ==================================================================
+# TROCA DE IP DO GATEWAY
+# ==================================================================
+cmd_ip() {
+    need_root "ip" "$@"
+    bash "$GWOS_DIR/scripts/trocar_ip.sh" "$@"
+}
+
+# ==================================================================
 # DIAGNÓSTICO
 # ==================================================================
 cmd_diag() {
@@ -488,6 +496,8 @@ cmd_help() {
     echo "  desbloqueio <email>          Desbloquear conta após tentativas excessivas"
     echo ""
     echo -e "${B}Sistema:${N}"
+    echo "  ip <novo_ip> [rede_cidr]     Trocar IP do gateway com validação e backup"
+    echo "                               Ex: gwos ip 172.14.29.20"
     echo "  update                       Atualizar GWOS via git (sem reinstalar)"
     echo ""
 }
@@ -682,6 +692,7 @@ case "$CMD" in
     backup)             cmd_backup "$@" ;;
     diag|diagnostico)   cmd_diag ;;
     dns)                cmd_dns "$@" ;;
+    ip|trocar-ip)       cmd_ip "$@" ;;
     update|atualizar)   cmd_update ;;
     resetsenha)         cmd_resetsenha "$@" ;;
     desbloqueio)        cmd_desbloqueio "$@" ;;

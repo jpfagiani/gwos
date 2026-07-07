@@ -9,9 +9,11 @@ options {
     };
     forward only;
 
-    // Aceita consultas apenas da rede interna e localhost
-    allow-query     { 127.0.0.1; 192.168.1.1; localnets; };
-    allow-recursion { 127.0.0.1; 192.168.1.1; localnets; };
+    // Aceita consultas apenas da rede interna e localhost.
+    // "localnets" cobre automaticamente qualquer rede das interfaces locais —
+    // não é preciso editar este arquivo ao trocar o IP do gateway.
+    allow-query     { localhost; localnets; };
+    allow-recursion { localhost; localnets; };
 
     // Segurança
     dnssec-validation no;

@@ -216,6 +216,37 @@ Propagação em até 60 segundos.
 
 ---
 
+## 8.1 Trocar o IP do Gateway
+
+Use **sempre** o comando dedicado — nunca edite `/etc/network/interfaces` na mão:
+
+```bash
+# Trocar apenas o IP (mantém a rede atual)
+sudo gwos ip 172.14.29.20
+
+# Trocar IP e rede
+sudo gwos ip 10.14.29.1 10.14.29.0/24
+```
+
+O comando faz, nesta ordem:
+
+1. Valida o IP e confere que ele pertence à rede informada
+2. Gera o novo `/etc/network/interfaces` em arquivo temporário e **valida a sintaxe com `ifquery` antes de gravar** (se inválido, nada é alterado)
+3. Cria backup do arquivo original (`/etc/network/interfaces.bak.<data>`)
+4. **Adiciona** o novo IP na interface antes de remover o antigo — a interface nunca fica sem IP e a sessão não cai
+5. Atualiza banco (`ip_gateway`, `rede_lan`), `.env`, BIND9, Squid e regenera o nftables (cada um validado com sua ferramenta antes do reload)
+6. Só então remove o IP antigo
+
+O comando **não** executa `systemctl restart networking` — a mudança vale imediatamente via `ip addr` e persiste no reboot pelo arquivo já validado.
+
+Depois da troca, se a **rede** mudou:
+- Atualize gateway/DNS nos clientes da LAN
+- Atualize hosts do DNS interno: `gwos dns update <host> <novo_ip>`
+
+Se algo der errado, o próprio comando mostra o caminho do backup para restaurar.
+
+---
+
 ## 9. Comando `gwos` (CLI)
 
 Ferramenta de administração via terminal. Disponível após a instalação.
@@ -233,6 +264,7 @@ gwos <comando> [opções]
 | `gwos reload squid` | Recarrega só o Squid |
 | `gwos reload nginx` | Recarrega só o Nginx |
 | `gwos diag` | Diagnóstico completo do sistema |
+| `gwos ip <novo_ip> [rede]` | Troca o IP do gateway com validação e backup |
 | `gwos update` | Atualiza o código via git |
 | `gwos log tail [N]` | Últimas N linhas do log do Squid (padrão: 50) |
 | `gwos log live` | Monitorar acessos em tempo real |
