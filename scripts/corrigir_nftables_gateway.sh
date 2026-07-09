@@ -39,6 +39,19 @@ fi
 
 [ "$NAT_ATIVO" = "1" ] && MASQ="oif \"$IFACE_WAN\" masquerade" || MASQ="# masquerade desativado"
 
+# Redes locais conectadas à LAN (IP principal + aliases) — roteadas, não
+# interceptadas pelo proxy; cobre redes fora do RFC 1918 e a rede secundária.
+REDES_LOCAIS=$(
+    { ip -4 route show dev "$IFACE_LAN" scope link 2>/dev/null | awk '{print $1}'
+      [ -n "$REDE_LAN" ] && echo "$REDE_LAN"
+    } | grep -E '^[0-9.]+/[0-9]+$' | sort -u
+)
+RETURN_LOCAIS=""
+for _rede in $REDES_LOCAIS; do
+    RETURN_LOCAIS+="        iif \"$IFACE_LAN\" ip daddr ${_rede} return"$'\n'
+done
+[ -z "$RETURN_LOCAIS" ] && RETURN_LOCAIS="        # nenhuma rede local detectada"
+
 cat > /tmp/gwos_fix_nft.conf << NFTEOF
 #!/usr/sbin/nft -f
 
@@ -55,10 +68,9 @@ table ip gwos_nat {
     chain prerouting {
         type nat hook prerouting priority dstnat;
 
-        # Tráfego LAN→LAN e para o próprio gateway: não intercepta
-        # (rede configurada — pode estar fora das faixas RFC 1918, ex.: 172.14.x)
-        iif "$IFACE_LAN" ip daddr $REDE_LAN return
-        # Faixas privadas RFC 1918
+        # Redes locais do gateway (IP principal + aliases): roteia, não intercepta
+${RETURN_LOCAIS}
+        # Demais redes internas por rota estática (faixas RFC 1918)
         iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } return
 
         # Força DNS pelo BIND9 local

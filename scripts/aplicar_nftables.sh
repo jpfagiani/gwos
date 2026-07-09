@@ -84,11 +84,21 @@ else
     MASQ="        # masquerade desativado"
 fi
 
-# A rede LAN configurada pode estar FORA das faixas RFC 1918
-# (ex.: 172.14.29.0/24) — precisa de regra própria de return.
-RETURN_REDE_LAN="        # rede_lan não configurada no banco"
-[ -n "$REDE_LAN" ] && \
-    RETURN_REDE_LAN="        iif \"$IFACE_LAN\" ip daddr $REDE_LAN return"
+# Redes diretamente conectadas à interface LAN (IP principal + TODOS os
+# aliases, ex.: enp0s8:1 da rede secundária). Qualquer sub-rede local do
+# gateway é ROTEADA, não interceptada pelo proxy — cobre faixas fora do
+# RFC 1918 (ex.: 172.14.29.0/24) e a rede secundária SEM depender do banco,
+# sobrevivendo à regeneração das regras.
+REDES_LOCAIS=$(
+    { ip -4 route show dev "$IFACE_LAN" scope link 2>/dev/null | awk '{print $1}'
+      [ -n "$REDE_LAN" ] && echo "$REDE_LAN"
+    } | grep -E '^[0-9.]+/[0-9]+$' | sort -u
+)
+RETURN_REDE_LAN=""
+for _rede in $REDES_LOCAIS; do
+    RETURN_REDE_LAN+="        iif \"$IFACE_LAN\" ip daddr ${_rede} return"$'\n'
+done
+[ -z "$RETURN_REDE_LAN" ] && RETURN_REDE_LAN="        # nenhuma rede local detectada na LAN"
 
 # ------------------------------------------------------------------
 # Elementos dos sets (evita bloco vazio que pode falhar no nft)
@@ -125,10 +135,9 @@ ${NAT_DNAT}
         iif "$IFACE_LAN" udp dport 53 redirect
         iif "$IFACE_LAN" tcp dport 53 redirect
 
-        # Tráfego para a própria LAN (inclui gateway/painel): não intercepta
+        # Redes locais do gateway (IP principal + aliases): roteia, não intercepta
 ${RETURN_REDE_LAN}
-
-        # Tráfego entre redes internas: não intercepta (faixas privadas RFC 1918)
+        # Demais redes internas alcançáveis por rota estática (faixas RFC 1918)
         iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } return
 
         # Proxy transparente — apenas tráfego saindo para internet
