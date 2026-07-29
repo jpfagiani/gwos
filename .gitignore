@@ -1,0 +1,7 @@
+# Arquivos locais que não pertencem ao repositório
+*.rar
+*.zip
+*.bak
+.env
+.claude/
+backups/

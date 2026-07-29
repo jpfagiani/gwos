@@ -60,6 +60,59 @@ route add 172.14.29.0 MASK 255.255.255.0 10.14.29.254 -p
 
 > Após a instalação, acesse o painel e **troque a senha** no primeiro login.
 
+### 1.1 Instalação em máquina real (bare metal)
+
+O instalador detecta sozinho quando está numa máquina física
+(`systemd-detect-virt`) e, nesse caso, faz automaticamente:
+
+- habilita o componente **non-free-firmware** do Debian e instala o firmware
+  das placas de rede (`firmware-linux`, `firmware-realtek`,
+  `firmware-misc-nonfree`) — sem isso, placas Realtek/Broadcom comuns em
+  mini-PCs podem nem aparecer ou cair sob carga;
+- instala o **microcode** da CPU (Intel ou AMD, conforme o processador);
+- desativa o **NetworkManager** se existir (ele briga com o ifupdown pelo
+  controle das interfaces);
+- **fixa o nome de cada interface pelo MAC** (arquivos
+  `/etc/systemd/network/70-gwos-*.link`) — sem isso, uma atualização de
+  kernel ou uma placa PCI nova pode renomear `enp1s0` → `enp2s0` e derrubar
+  rede, firewall e Squid de uma vez.
+
+Checklist antes de instalar:
+
+1. **BIOS/UEFI:** configure **"Restore on AC Power Loss" = Power On** (o
+   gateway precisa voltar sozinho após queda de energia) e desative
+   suspensão/sleep. Se o boot travar pedindo teclado, desative "halt on
+   keyboard error".
+2. **Identifique as portas de rede:** com o cabo da internet em uma porta e
+   a LAN na outra, use `ip -br link` (quem tem `UP` tem cabo) ou
+   `ethtool -p enp1s0 10` (pisca o LED da porta por 10 s). Anote qual nome
+   corresponde a qual porta — o instalador vai perguntar.
+3. **Se a placa de rede não aparecer nem no instalador do Debian**, use a
+   imagem de instalação que já inclui firmware (padrão a partir do
+   Debian 12) ou instale com cabo em outra porta e rode o GWOS — ele
+   instala os firmwares que faltam.
+
+Migrando da máquina virtual para a física:
+
+```bash
+# Na VM (gera /var/lib/gwos/backups/gwos_backup_<data>.tar.gz):
+/opt/gwos/scripts/backup.sh
+
+# Na máquina física, após instalar o GWOS do zero:
+/opt/gwos/scripts/restaurar_backup.sh /caminho/do/gwos_backup_<data>.tar.gz
+```
+
+> Os **nomes das interfaces mudam** entre a VM e a máquina real
+> (ex.: `ens18` → `enp1s0`). Instale o GWOS do zero na física respondendo
+> as perguntas do instalador — ele gera todas as configurações com os nomes
+> certos — e use o backup só para trazer **banco e listas** (grupos, IPs,
+> domínios), não os arquivos de rede.
+
+> **Teste com monitor e teclado conectados** antes de colocar a máquina no
+> lugar definitivo. Nunca mexa na rede de um gateway remoto sem um console
+> de socorro — se algo der errado na troca de IP, é o console físico que
+> salva (use `gwos ip`, nunca `systemctl restart networking`).
+
 ---
 
 ## 2. Atualizar sem Reinstalar

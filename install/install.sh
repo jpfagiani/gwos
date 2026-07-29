@@ -248,6 +248,62 @@ read -rp "  Iniciar instalação? [S/n]: " INI; INI="${INI:-S}"
 [[ "$INI" =~ ^[Ss]$ ]] || { echo "Cancelado."; exit 0; }
 
 # ==================================================================
+titulo "══ Preparação do hardware ══"
+# ==================================================================
+# Em máquina virtual nada disso é necessário; em máquina real, placas de
+# rede (Realtek/Intel/Broadcom) e a CPU podem precisar de firmware e
+# microcode que ficam no componente non-free-firmware do Debian.
+
+VIRT="$(systemd-detect-virt 2>/dev/null || echo desconhecido)"
+if [ "$VIRT" != "none" ]; then
+    info "Ambiente virtualizado detectado (${VIRT}) — firmware de hardware não é necessário."
+else
+    info "Máquina real detectada — habilitando firmware e microcode..."
+
+    # Habilita o componente non-free-firmware (Debian 12+), se ainda não estiver
+    if ! grep -Rqs "non-free-firmware" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+        if [ -f /etc/apt/sources.list.d/debian.sources ]; then
+            sed -i 's/^Components: \(.*\)/Components: \1 non-free-firmware/' \
+                /etc/apt/sources.list.d/debian.sources
+        elif [ -f /etc/apt/sources.list ]; then
+            sed -Ei '/debian\.org/ s/^(deb[[:space:]].*[[:space:]]main)([[:space:]]|$)/\1 non-free-firmware\2/' \
+                /etc/apt/sources.list
+        fi
+        apt-get update -qq
+        ok "Componente non-free-firmware habilitado."
+    fi
+
+    # Firmware de placas de rede e diversos (melhor esforço — nomes variam por versão)
+    for pkg in firmware-linux firmware-realtek firmware-misc-nonfree; do
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$pkg" 2>/dev/null \
+            && ok "Firmware: $pkg" \
+            || aviso "Pacote $pkg não disponível — pulando."
+    done
+
+    # Microcode conforme o fabricante da CPU
+    CPU_VENDOR=$(grep -m1 vendor_id /proc/cpuinfo | awk '{print $3}' || true)
+    case "$CPU_VENDOR" in
+        GenuineIntel)  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq intel-microcode 2>/dev/null \
+                           && ok "Microcode Intel instalado." || aviso "intel-microcode não disponível." ;;
+        AuthenticAMD)  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq amd64-microcode 2>/dev/null \
+                           && ok "Microcode AMD instalado." || aviso "amd64-microcode não disponível." ;;
+        *)             aviso "Fabricante de CPU não identificado (${CPU_VENDOR:-vazio}) — microcode não instalado." ;;
+    esac
+
+    # Firmware que o kernel tentou carregar e não achou (resolve após reboot)
+    if dmesg 2>/dev/null | grep -iE "firmware.*(failed|error)|failed to load firmware" | head -3 | grep -q .; then
+        aviso "O kernel registrou falhas de firmware no boot atual — reinicie após a instalação"
+        aviso "para que as placas carreguem o firmware recém-instalado."
+    fi
+
+    # NetworkManager briga com o ifupdown pelo controle das interfaces
+    if systemctl is-enabled NetworkManager &>/dev/null; then
+        systemctl disable --now NetworkManager 2>/dev/null || true
+        aviso "NetworkManager desativado — as interfaces passam a ser controladas pelo ifupdown."
+    fi
+fi
+
+# ==================================================================
 titulo "══ Instalando pacotes ══"
 # ==================================================================
 
@@ -350,6 +406,33 @@ NETEOF
 fi
 
 ok "/etc/network/interfaces configurado."
+
+# ------------------------------------------------------------------
+# Máquina real: fixa o nome de cada interface pelo MAC (.link do
+# systemd). Sem isso, uma atualização de kernel/udev ou uma placa nova
+# pode renomear enp1s0 → enp2s0 e derrubar rede, firewall e squid de
+# uma vez — o nome está amarrado em todas as configurações geradas.
+# ------------------------------------------------------------------
+if [ "$VIRT" = "none" ]; then
+    mkdir -p /etc/systemd/network
+    for IFPIN in "$IFACE_WAN" "$IFACE_LAN"; do
+        MACPIN=$(cat "/sys/class/net/${IFPIN}/address" 2>/dev/null || true)
+        if [ -n "$MACPIN" ] && [ "$MACPIN" != "00:00:00:00:00:00" ]; then
+            cat > "/etc/systemd/network/70-gwos-${IFPIN}.link" <<LINKEOF
+# Gerado pelo instalador GWOS — mantém o nome '${IFPIN}' amarrado a esta
+# placa física. Se trocar a placa de rede, apague este arquivo e ajuste
+# /etc/network/interfaces, /etc/nftables.conf e /etc/squid/squid.conf.
+[Match]
+MACAddress=${MACPIN}
+
+[Link]
+Name=${IFPIN}
+LINKEOF
+            ok "Nome '${IFPIN}' fixado ao MAC ${MACPIN}."
+        fi
+    done
+    update-initramfs -u -k all >/dev/null 2>&1 || true
+fi
 
 # Aplica a configuração sem reiniciar o serviço de rede inteiro
 # (evita cair a sessão SSH na WAN se for DHCP já com IP)
