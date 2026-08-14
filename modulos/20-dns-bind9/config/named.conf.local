@@ -48,3 +48,14 @@ zone "prodesp.sp.gov.br" {
 // 25-dns-interno), quando ele estiver instalado.
 // ---------------------------------------------------------
 include "/etc/bind/named.conf.gwos-integracao";
+
+// ---------------------------------------------------------
+// Zonas do administrador.
+//
+// ESTE arquivo (named.conf.local) é SOBRESCRITO quando o módulo
+// 20-dns-bind9 é reinstalado. Zonas escritas à mão devem ir para
+// o arquivo abaixo, que o instalador cria uma vez e nunca mais
+// toca. Se a zona for permanente e valer para toda instalação
+// nova, prefira acrescentá-la aqui no repositório.
+// ---------------------------------------------------------
+include "/etc/bind/named.conf.zonas-locais";

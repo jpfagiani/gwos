@@ -26,6 +26,11 @@ rm -f /etc/bind/db.rpz.gwos \
 rm -rf /var/log/named
 ok "Configurações do GWOS removidas do BIND9."
 
+# Zonas escritas à mão não são nossas para apagar
+if [ -f /etc/bind/named.conf.zonas-locais ]; then
+    aviso "Mantido: /etc/bind/named.conf.zonas-locais (suas zonas)."
+fi
+
 if confirmar "Remover também os pacotes bind9?"; then
     DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq bind9 bind9-utils 2>/dev/null || true
     apt-get autoremove -y -qq 2>/dev/null || true

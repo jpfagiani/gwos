@@ -62,6 +62,39 @@ resolver respondeu mais rápido.
 
 Para acrescentar outro domínio interno, copie um desses blocos.
 
+## Nome novo na rede: zona ou host?
+
+Na maioria das vezes **não é zona**. Decida assim:
+
+| Você quer | Faça |
+|-----------|------|
+| Um nome apontando para um IP da LAN (`portal`, `samba`, uma impressora) | `gwos dns add <nome> <ip>` — vira host no domínio interno, servido pelo dnsmasq |
+| Mandar um domínio inteiro para outro servidor DNS | zona `type forward` |
+| Ser autoridade de um domínio, com vários registros | zona `type master` + arquivo de registros |
+
+### Criar uma zona
+
+Escreva em **`/etc/bind/named.conf.zonas-locais`** — o instalador cria esse
+arquivo uma vez e nunca mais o toca. O `named.conf.local` **é sobrescrito** a
+cada reinstalação do módulo; zona escrita lá se perde.
+
+```bash
+cat >> /etc/bind/named.conf.zonas-locais <<'EOF'
+zone "exemplo.sp.gov.br" {
+    type forward;
+    forward only;
+    forwarders { 10.1.6.222; };
+};
+EOF
+
+named-checkconf && rndc reload
+dig exemplo.sp.gov.br @127.0.0.1
+```
+
+Se a zona for permanente e tiver de valer para toda instalação nova,
+acrescente-a a `config/named.conf.local` neste repositório em vez do arquivo
+local — assim ela vai junto no git.
+
 ## Instalação
 
 ```bash

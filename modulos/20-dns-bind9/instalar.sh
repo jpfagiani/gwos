@@ -65,6 +65,46 @@ fi
 chown bind:bind /etc/bind/named.conf.gwos-integracao /etc/bind/named.conf.gwos-forwarders
 ok "Resolvers upstream: ${DNS_FORWARDERS}"
 
+# Zonas escritas à mão pelo administrador. Criado uma vez e nunca mais tocado
+# — o named.conf.local É sobrescrito a cada reinstalação, este não.
+if [ ! -f /etc/bind/named.conf.zonas-locais ]; then
+    cat > /etc/bind/named.conf.zonas-locais <<'ZONAS'
+// ============================================================
+// GWOS — zonas do administrador
+// ============================================================
+// Arquivo criado uma vez pelo módulo 20-dns-bind9 e NUNCA
+// sobrescrito. É aqui que vão as zonas escritas à mão.
+//
+// Depois de editar:  named-checkconf && rndc reload
+//
+// Encaminhar um domínio para outro servidor DNS:
+//
+//   zone "exemplo.sp.gov.br" {
+//       type forward;
+//       forward only;
+//       forwarders { 10.1.6.222; };
+//   };
+//
+// Zona própria, com arquivo de registros:
+//
+//   zone "minhazona.local" {
+//       type master;
+//       file "/etc/bind/db.minhazona.local";
+//       allow-update { none; };
+//   };
+//
+// Para nomes soltos da LAN (portal, samba, impressora) NÃO crie
+// zona: use 'gwos dns add <nome> <ip>', que é servido pelo
+// dnsmasq no domínio interno.
+// ============================================================
+ZONAS
+    chown bind:bind /etc/bind/named.conf.zonas-locais
+    ok "Ponto de extensão criado: /etc/bind/named.conf.zonas-locais"
+else
+    chown bind:bind /etc/bind/named.conf.zonas-locais
+    aviso "Zonas do administrador preservadas (/etc/bind/named.conf.zonas-locais)."
+fi
+
 mkdir -p /var/log/named
 chown bind:bind /var/log/named
 chmod 755 /var/log/named
