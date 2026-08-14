@@ -128,7 +128,35 @@ dns_defnames off
 SQINT
     _msg ok "Squid → DNS: ${DNS_SQUID} (${DNS_ORIGEM})"
 
-    # -- 2b. ACLs das redes internas -----------------------------------------
+    # -- 2b. Portas de escuta -------------------------------------------------
+    # Mesmas portas que o firewall usa no redirecionamento — geradas de um
+    # lugar só para que nftables e Squid nunca discordem.
+    CERTGEN=""
+    for _p in /usr/lib/squid/security_file_certgen \
+              /usr/libexec/squid/security_file_certgen \
+              /usr/lib/squid4/security_file_certgen; do
+        [ -x "$_p" ] && { CERTGEN="$_p"; break; }
+    done
+
+    {
+        echo "# Gerado por gwos-integrar a partir de ${GWOS_CONF} — NÃO editar à mão."
+        echo "http_port ${SQUID_PORTA_FWD}"
+        echo "http_port ${SQUID_PORTA} intercept"
+        if [ -n "$CERTGEN" ] && tem_ssl_bump; then
+            echo "https_port ${SQUID_PORTA_SSL} intercept ssl-bump \\"
+            echo "    generate-host-certificates=on \\"
+            echo "    dynamic_cert_mem_cache_size=16MB \\"
+            echo "    cert=/etc/squid/ssl_cert/gwos-ca.crt \\"
+            echo "    key=/etc/squid/ssl_cert/gwos-ca.key"
+            echo "sslcrtd_program ${CERTGEN} -s /var/lib/squid/ssl_db -M 16MB"
+            echo "sslcrtd_children 8 startup=2 idle=2"
+        else
+            echo "# SSL Bump desativado (sem certgen ou sem CA) — HTTPS não é interceptado."
+        fi
+    } > /etc/squid/conf.d/gwos_portas.conf
+    _msg ok "Squid → portas: ${SQUID_PORTA_FWD} (explícito), ${SQUID_PORTA} (HTTP)$(tem_ssl_bump && [ -n "$CERTGEN" ] && echo ", ${SQUID_PORTA_SSL} (HTTPS)" || echo "")"
+
+    # -- 2c. ACLs das redes internas -----------------------------------------
     {
         echo "# Gerado por gwos-integrar a partir de ${GWOS_CONF} — NÃO editar à mão."
         for rede in $(redes_internas); do

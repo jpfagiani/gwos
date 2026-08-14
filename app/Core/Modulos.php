@@ -55,7 +55,7 @@ class Modulos
             'icone'    => 'bi-tag',
             'secao'    => 'Rede',
             'rota'     => '/modulos/nomes',
-            'tela'     => false,   // vira true quando a tela do modulo existir
+            'tela'     => true,
             'servicos' => ['gwos-dnsmasq'],
             'resumo'   => 'Vincular um nome a um IP da LAN',
         ],
@@ -65,7 +65,7 @@ class Modulos
             'icone'    => 'bi-clock-history',
             'secao'    => 'Rede',
             'rota'     => '/modulos/hora',
-            'tela'     => false,   // vira true quando a tela do modulo existir
+            'tela'     => true,
             'servicos' => ['chrony'],
             'resumo'   => 'Servidores NTP e quem sincroniza',
         ],
@@ -75,7 +75,7 @@ class Modulos
             'icone'    => 'bi-shield-lock',
             'secao'    => 'Rede',
             'rota'     => '/modulos/firewall',
-            'tela'     => false,   // vira true quando a tela do modulo existir
+            'tela'     => true,
             'servicos' => ['nftables'],
             'resumo'   => 'Regras, NAT e redirecionamentos',
         ],
@@ -85,7 +85,7 @@ class Modulos
             'icone'    => 'bi-globe',
             'secao'    => 'Rede',
             'rota'     => '/modulos/proxy',
-            'tela'     => false,   // vira true quando a tela do modulo existir
+            'tela'     => true,
             'servicos' => ['squid'],
             'resumo'   => 'Portas, listas e certificado da CA',
         ],

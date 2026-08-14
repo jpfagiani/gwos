@@ -18,3 +18,24 @@ $router->post('/modulos/dns/zonas',              'DnsController@adicionarZona');
 $router->post('/modulos/dns/zonas/{dominio}/remover', 'DnsController@removerZona');
 $router->get ('/modulos/dns/testar',             'DnsController@testar');
 $router->get ('/modulos/dns/testar-forwarders',  'DnsController@testarForwarders');
+
+// --- 25-dns-interno-dnsmasq -----------------------------------------------
+$router->get ('/modulos/nomes',                    'NomesController@index');
+$router->post('/modulos/nomes',                    'NomesController@adicionar');
+$router->post('/modulos/nomes/{host}/atualizar',   'NomesController@atualizar');
+$router->post('/modulos/nomes/{host}/remover',     'NomesController@remover');
+
+// --- 30-hora-chrony -------------------------------------------------------
+$router->get ('/modulos/hora',           'HoraController@index');
+$router->post('/modulos/hora',           'HoraController@salvar');
+$router->get ('/modulos/hora/clientes',  'HoraController@clientes');
+
+// --- 40-firewall-nftables -------------------------------------------------
+$router->get ('/modulos/firewall',          'FirewallController@index');
+$router->post('/modulos/firewall/regerar',  'FirewallController@regerar');
+
+// --- 50-proxy-squid -------------------------------------------------------
+$router->get ('/modulos/proxy',             'ProxyController@index');
+$router->post('/modulos/proxy/portas',      'ProxyController@salvarPortas');
+$router->post('/modulos/proxy/recarregar',  'ProxyController@recarregar');
+$router->get ('/modulos/proxy/verificar',   'ProxyController@verificar');

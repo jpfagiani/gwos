@@ -182,6 +182,8 @@ grep -q '@includedir /etc/sudoers.d' /etc/sudoers || echo '@includedir /etc/sudo
     # validação dos valores e o named-checkconf ficam dentro dos scripts.
     echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-definir"
     echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-zona"
+    # Leitura e recarga dos serviços, com par (ação, módulo) de lista fechada
+    echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-servico"
 } > /etc/sudoers.d/gwos
 chmod 440 /etc/sudoers.d/gwos
 visudo -c -f /etc/sudoers.d/gwos >/dev/null || {

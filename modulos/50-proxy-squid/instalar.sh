@@ -79,6 +79,11 @@ done
 [ -f /etc/squid/conf.d/gwos_integracao.conf ] || \
     printf '# Gerado por gwos-integrar.\ndns_nameservers 8.8.8.8 1.1.1.1\ndns_defnames off\n' \
         > /etc/squid/conf.d/gwos_integracao.conf
+
+# Portas — o gwos-integrar regrava no fim; aqui só o mínimo para o Squid
+# passar no 'squid -k parse' antes de a CA existir.
+printf '# Gerado por gwos-integrar.\nhttp_port %s\nhttp_port %s intercept\n' \
+    "${SQUID_PORTA_FWD}" "${SQUID_PORTA}" > /etc/squid/conf.d/gwos_portas.conf
 ok "Configuração e listas instaladas."
 
 # ---------------------------------------------------------------------------
@@ -114,7 +119,8 @@ if [ -n "$CERTGEN" ]; then
     runuser -u proxy -- "$CERTGEN" -c -s "$SSL_DB" -M 16MB
     ok "Banco de certificados dinâmicos criado."
 
-    sed -i "s|/usr/lib/squid/security_file_certgen|${CERTGEN}|g" /etc/squid/squid.conf
+    # O caminho do certgen e a porta HTTPS entram no gwos_portas.conf, gerado
+    # pelo gwos-integrar no fim desta instalação.
 
     # Publica a CA para download, se o painel existir
     if REPO="$(raiz_projeto)"; then
@@ -127,8 +133,8 @@ if [ -n "$CERTGEN" ]; then
 else
     aviso "security_file_certgen não encontrado — SSL Bump desativado."
     aviso "Instale squid-openssl e reexecute este módulo para inspecionar HTTPS."
-    sed -i 's|^https_port|#https_port|g'   /etc/squid/squid.conf
-    sed -i 's|^sslcrtd_|#sslcrtd_|g'       /etc/squid/squid.conf
+    # As portas ficam no arquivo gerado; aqui só as diretivas de SSL que
+    # continuam no squid.conf e seriam fatais num Squid sem suporte a TLS.
     sed -i 's|^ssl_bump|#ssl_bump|g'       /etc/squid/squid.conf
     sed -i 's|^acl step1|#acl step1|g'     /etc/squid/squid.conf
     sed -i 's|ssl::server_name|dstdomain|g' /etc/squid/squid.conf

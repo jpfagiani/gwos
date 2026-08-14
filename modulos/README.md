@@ -30,8 +30,28 @@ bash modulos/verificar-todos.sh
 | `50-proxy-squid` | `squid` | Proxy 3127/3128/3129, SSL Bump e a CA |
 | `60-painel-web` | `nginx`, `php8.4-fpm` | Painel, comando `gwos`, sudoers e cron |
 
-Ordem recomendada: a numérica. Só há uma dependência dura — o **60-painel-web
-exige o 10-banco-mariadb**. Todo o resto é opcional.
+Ordem recomendada: a numérica. Nenhuma dependência é obrigatória: sem o
+`10-banco-mariadb` o painel sobe em modo leve, com as telas cujos dados vivem
+em arquivo.
+
+## Telas no painel
+
+Com o `60-painel-web` instalado, cada módulo abaixo ganha sua própria tela. A
+lista de módulos é lida de `/etc/gwos/modulos.d` a cada carregamento —
+instalou pelo terminal, a seção aparece na próxima página.
+
+| Módulo | Tela | O que dá para fazer |
+|--------|------|---------------------|
+| `20-dns-bind9` | DNS | Editar resolvers, testar cada um, criar e remover zonas, resolver nome ao vivo |
+| `25-dns-interno` | Nomes internos | Vincular nome a IP, alterar, remover |
+| `30-hora-chrony` | Hora | Trocar servidores NTP, ver sincronização e quem consulta |
+| `40-firewall-nftables` | Firewall | Ver regras em vigor e por que cada uma está lá; regerar |
+| `50-proxy-squid` | Proxy | Portas, estado do SSL Bump, listas incluídas, últimos acessos |
+
+Nenhuma tela escreve em `/etc` direto. Tudo passa por `gwos-definir`,
+`gwos-zona` ou `gwos-servico`, que validam antes de aplicar — e o firewall não
+tem edição de regra crua de propósito: as regras são derivadas, e um formulário
+criaria uma segunda fonte de verdade que a primeira regeração apagaria.
 
 ---
 
@@ -90,6 +110,7 @@ Estado e registro:
 /usr/local/sbin/gwos-integrar        re-costura tudo
 /usr/local/sbin/gwos-definir         altera uma chave do gwos.conf, com validação
 /usr/local/sbin/gwos-zona            zonas de encaminhamento do BIND9
+/usr/local/sbin/gwos-servico         lê e recarrega serviços (par ação/módulo fixo)
 /usr/local/sbin/gwos-gerar-nftables  regera o firewall
 /usr/local/sbin/gwos-gerar-dnsmasq   regera o dnsmasq
 /usr/local/sbin/gwos-senha-padrao    senha inicial do painel
