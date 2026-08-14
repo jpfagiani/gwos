@@ -97,9 +97,32 @@ salvar_conf PHP_VERSAO "$PHP_VER"
 # máquina. Antes o instalador escrevia o vhost na 80 assim mesmo, o nginx -t
 # passava (a configuração é válida) e o serviço só falhava ao subir, com
 # "control process exited with error code" — sem dizer o motivo.
+SITES_EXISTENTES="$(nginx_outros_sites)"
 DONO_80="$(porta_em_uso "$PAINEL_PORTA")"
+PADRAO=" default_server"
 
-if [ -n "$DONO_80" ] && ! echo "$DONO_80" | grep -q 'nginx'; then
+if [ "${SITES_EXISTENTES:-0}" -gt 0 ]; then
+    # ─────────────────────────────────────────────────────────────────────
+    # O nginx desta máquina JÁ SERVE outra coisa (um portal, um sistema
+    # interno). Duas regras, as duas obrigatórias:
+    #
+    # 1. Porta dedicada. Dividir a 80 não funciona: sem default_server o
+    #    painel nunca seria escolhido; com default_server ele roubaria toda
+    #    requisição cujo Host não casa com um server_name explícito — que é
+    #    exatamente o caso de quem acessa o portal por NetBIOS.
+    #
+    # 2. Nunca virar default_server. Vale mesmo em porta dedicada, para não
+    #    mudar o comportamento de nada que já existe.
+    # ─────────────────────────────────────────────────────────────────────
+    aviso "O nginx já serve ${SITES_EXISTENTES} site(s) nesta máquina."
+    NOVA="$(primeira_porta_livre 8080 8081 8090 9080 || true)"
+    [ -n "$NOVA" ] || erro "Nenhuma porta livre para o painel — libere uma e reexecute."
+    PAINEL_PORTA="$NOVA"
+    PADRAO=""
+    ok "Painel em porta dedicada: ${PAINEL_PORTA}. Os sites existentes não são tocados."
+
+elif [ -n "$DONO_80" ] && ! echo "$DONO_80" | grep -q 'nginx'; then
+    # Outro servidor web (Apache, por exemplo) ocupa a 80.
     aviso "A porta ${PAINEL_PORTA} já está em uso por: ${DONO_80}"
     NOVA="$(primeira_porta_livre 8080 8081 8090 9080 || true)"
     [ -n "$NOVA" ] || erro "Nenhuma porta alternativa livre — libere a ${PAINEL_PORTA} e reexecute."
@@ -108,10 +131,10 @@ if [ -n "$DONO_80" ] && ! echo "$DONO_80" | grep -q 'nginx'; then
     echo "      O serviço que ocupa a 80 continua intacto."
 fi
 
-# 'default_server' só pode existir uma vez por porta. Se outro vhost já o
-# declara, usar de novo faria o nginx recusar a configuração inteira.
-PADRAO=" default_server"
-if grep -rlq "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null; then
+# 'default_server' só pode existir uma vez por porta — repetir faria o nginx
+# recusar a configuração inteira.
+if [ -n "$PADRAO" ] && \
+   grep -rlq "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null; then
     OUTRO=$(grep -rl "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null \
             | grep -v '/gwos$' | head -1)
     if [ -n "$OUTRO" ]; then
@@ -144,9 +167,11 @@ NGINX
 
 ln -sf /etc/nginx/sites-available/gwos /etc/nginx/sites-enabled/gwos
 
-# O site 'default' do Debian só sai se for o único além do nosso — numa
-# máquina compartilhada ele pode ser o portal de alguém.
-if [ -e /etc/nginx/sites-enabled/default ] && [ "$(nginx_outros_sites)" -le 1 ]; then
+# O 'default' de fábrica só sai quando o painel assume a porta 80 e não há
+# mais nada servido aqui. Numa máquina compartilhada ele fica: pode ter sido
+# adaptado para servir algo.
+if [ -e /etc/nginx/sites-enabled/default ] \
+   && [ "${SITES_EXISTENTES:-0}" -eq 0 ] && [ "$PAINEL_PORTA" = "80" ]; then
     rm -f /etc/nginx/sites-enabled/default
     info "Site 'default' do Debian removido."
 fi

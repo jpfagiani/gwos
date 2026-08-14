@@ -364,16 +364,18 @@ php_versao_suficiente() {
     [ "$b" -ge "$d" ]
 }
 
-# Sites do nginx que não são o do GWOS
+# Sites de terceiros no nginx — nem o do GWOS nem o 'default' de fábrica.
+# O Debian habilita o 'default' em toda instalação nova; contá-lo faria uma
+# máquina limpa parecer compartilhada.
 nginx_outros_sites() {
     local n=0
     if [ -d /etc/nginx/sites-enabled ]; then
         n=$(find /etc/nginx/sites-enabled -maxdepth 1 \( -type f -o -type l \) \
-              ! -name 'gwos' 2>/dev/null | wc -l)
+              ! -name 'gwos' ! -name 'default' 2>/dev/null | wc -l)
     fi
     if [ -d /etc/nginx/conf.d ]; then
         n=$(( n + $(find /etc/nginx/conf.d -maxdepth 1 -name '*.conf' \
-              ! -name 'gwos*' 2>/dev/null | wc -l) ))
+              ! -name 'gwos*' ! -name 'default*' 2>/dev/null | wc -l) ))
     fi
     echo "$n"
 }
