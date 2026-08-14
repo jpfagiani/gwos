@@ -124,6 +124,9 @@ grep -q '@includedir /etc/sudoers.d' /etc/sudoers || echo '@includedir /etc/sudo
     done
     echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-gerar-nftables"
     echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-integrar"
+    # Único caminho de escrita do painel no /etc/gwos/gwos.conf. A lista de
+    # chaves e a validação dos valores ficam dentro do gwos-definir.
+    echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-definir"
 } > /etc/sudoers.d/gwos
 chmod 440 /etc/sudoers.d/gwos
 visudo -c -f /etc/sudoers.d/gwos >/dev/null || {

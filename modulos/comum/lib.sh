@@ -310,6 +310,7 @@ instalar_ferramentas_comuns() {
     local origem="${GWOS_MODULOS_DIR}/comum"
     [ -f "${origem}/lib.sh" ]      && install -m 644 "${origem}/lib.sh"      "${GWOS_ETC}/lib.sh"
     [ -f "${origem}/integrar.sh" ] && install -m 755 "${origem}/integrar.sh" /usr/local/sbin/gwos-integrar
+    [ -f "${origem}/definir.sh" ]  && install -m 755 "${origem}/definir.sh"  /usr/local/sbin/gwos-definir
     return 0
 }
 
