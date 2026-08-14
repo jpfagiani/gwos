@@ -60,10 +60,11 @@ else
 fi
 
 if command -v curl >/dev/null 2>&1; then
-    COD=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1/" 2>/dev/null)
+    PORTA="${PAINEL_PORTA:-80}"
+    COD=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:${PORTA}/" 2>/dev/null)
     case "$COD" in
-        200|302|301) ok "Painel respondendo (HTTP ${COD})." ;;
-        *) falha "Painel não respondeu como esperado (HTTP ${COD:-sem resposta})."; FALHAS=$((FALHAS+1)) ;;
+        200|302|301) ok "Painel respondendo na porta ${PORTA} (HTTP ${COD})." ;;
+        *) falha "Painel não respondeu na porta ${PORTA} (HTTP ${COD:-sem resposta})."; FALHAS=$((FALHAS+1)) ;;
     esac
 fi
 

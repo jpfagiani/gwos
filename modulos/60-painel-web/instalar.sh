@@ -91,11 +91,38 @@ ok "PHP-FPM ${PHP_VER} configurado (${PHP_SOCK})."
 salvar_conf PHP_VERSAO "$PHP_VER"
 
 # ---------------------------------------------------------------------------
-# Nginx
+# Nginx — escolhe uma porta livre
 # ---------------------------------------------------------------------------
+# A 80 costuma já estar tomada: Apache, um portal, outro site na mesma
+# máquina. Antes o instalador escrevia o vhost na 80 assim mesmo, o nginx -t
+# passava (a configuração é válida) e o serviço só falhava ao subir, com
+# "control process exited with error code" — sem dizer o motivo.
+DONO_80="$(porta_em_uso "$PAINEL_PORTA")"
+
+if [ -n "$DONO_80" ] && ! echo "$DONO_80" | grep -q 'nginx'; then
+    aviso "A porta ${PAINEL_PORTA} já está em uso por: ${DONO_80}"
+    NOVA="$(primeira_porta_livre 8080 8081 8090 9080 || true)"
+    [ -n "$NOVA" ] || erro "Nenhuma porta alternativa livre — libere a ${PAINEL_PORTA} e reexecute."
+    PAINEL_PORTA="$NOVA"
+    ok "O painel vai responder na porta ${PAINEL_PORTA}."
+    echo "      O serviço que ocupa a 80 continua intacto."
+fi
+
+# 'default_server' só pode existir uma vez por porta. Se outro vhost já o
+# declara, usar de novo faria o nginx recusar a configuração inteira.
+PADRAO=" default_server"
+if grep -rlq "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null; then
+    OUTRO=$(grep -rl "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null \
+            | grep -v '/gwos$' | head -1)
+    if [ -n "$OUTRO" ]; then
+        PADRAO=""
+        aviso "$(basename "$OUTRO") já é o default_server da porta ${PAINEL_PORTA} — o GWOS entra como vhost comum."
+    fi
+fi
+
 cat > /etc/nginx/sites-available/gwos <<NGINX
 server {
-    listen 80 default_server;
+    listen ${PAINEL_PORTA}${PADRAO};
     server_name _;
     root ${REPO}/public;
     index index.php;
@@ -116,18 +143,43 @@ server {
 NGINX
 
 ln -sf /etc/nginx/sites-available/gwos /etc/nginx/sites-enabled/gwos
-rm -f /etc/nginx/sites-enabled/default
+
+# O site 'default' do Debian só sai se for o único além do nosso — numa
+# máquina compartilhada ele pode ser o portal de alguém.
+if [ -e /etc/nginx/sites-enabled/default ] && [ "$(nginx_outros_sites)" -le 1 ]; then
+    rm -f /etc/nginx/sites-enabled/default
+    info "Site 'default' do Debian removido."
+fi
+
 nginx -t || erro "nginx -t reprovou a configuração."
-svc_ativar nginx
-systemctl reload nginx
-ok "Nginx configurado."
+
+if ! svc_ativar nginx; then
+    falha "O nginx não subiu. Últimas linhas do log:"
+    journalctl -xeu nginx --no-pager -n 15 2>/dev/null | sed 's/^/      /' || true
+    echo ""
+    OCUPADA="$(porta_em_uso "$PAINEL_PORTA")"
+    if [ -n "$OCUPADA" ]; then
+        echo "      A porta ${PAINEL_PORTA} está com: ${OCUPADA}"
+        echo "      Escolha outra porta em ${GWOS_CONF} (PAINEL_PORTA) e reexecute."
+    fi
+    erro "Módulo interrompido — o site do GWOS ficou configurado mas não está no ar."
+fi
+systemctl reload nginx 2>/dev/null || true
+salvar_conf PAINEL_PORTA "$PAINEL_PORTA"
+ok "Nginx configurado na porta ${PAINEL_PORTA}."
 
 # ---------------------------------------------------------------------------
 # .env
 # ---------------------------------------------------------------------------
+if [ "$PAINEL_PORTA" = "80" ]; then
+    APP_URL_PAINEL="http://${IP_GATEWAY}"
+else
+    APP_URL_PAINEL="http://${IP_GATEWAY}:${PAINEL_PORTA}"
+fi
+
 if [ "$MODO_LEVE" = "0" ]; then
     cat > "${REPO}/.env" <<ENV
-APP_URL=http://${IP_GATEWAY}
+APP_URL=${APP_URL_PAINEL}
 APP_DEBUG=false
 DB_HOST=${DB_HOST}
 DB_BANCO=${DB_BANCO}
@@ -136,7 +188,7 @@ DB_SENHA=${DB_SENHA}
 ENV
 else
     cat > "${REPO}/.env" <<ENV
-APP_URL=http://${IP_GATEWAY}
+APP_URL=${APP_URL_PAINEL}
 APP_DEBUG=false
 # Modo leve — sem banco de dados. Os usuários do painel ficam em
 # /etc/gwos/painel-usuarios.json. Instale o módulo 10-banco-mariadb e
@@ -257,7 +309,7 @@ integrar
 
 echo ""
 ok "Módulo 60-painel-web instalado."
-echo -e "  URL          : ${BOLD}http://${IP_GATEWAY}${NC}"
+echo -e "  URL          : ${BOLD}${APP_URL_PAINEL}${NC}"
 echo -e "  Login        : ${BOLD}admin@gwos.local${NC}"
 echo -e "  Senha padrão : ${BOLD}gwos@2025${NC}  ${YELLOW}(troque no primeiro acesso)${NC}"
 if [ "$MODO_LEVE" = "1" ]; then

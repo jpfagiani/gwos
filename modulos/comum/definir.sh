@@ -70,6 +70,7 @@ SQUID_PORTA|val_porta|Porta HTTP transparente do Squid
 SQUID_PORTA_SSL|val_porta|Porta HTTPS (SSL Bump) do Squid
 SQUID_PORTA_FWD|val_porta|Porta do proxy explícito
 DNSMASQ_PORTA|val_porta|Porta do dnsmasq interno
+PAINEL_PORTA|val_porta|Porta do painel web (nginx)
 "
 
 listar_chaves() {

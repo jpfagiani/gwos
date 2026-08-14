@@ -149,6 +149,9 @@ NTP_POOL="${NTP_POOL:-pool.ntp.br}"
 # ── Painel ──────────────────────────────────────────────────────────────
 # Versão do PHP em uso, detectada da distribuição pelo módulo 60-painel-web.
 PHP_VERSAO=${PHP_VERSAO:-}
+# Porta do painel. Vira 8080 (ou a próxima livre) quando a 80 já está ocupada
+# por outro servidor web na mesma máquina — Apache, um portal, outro site.
+PAINEL_PORTA=${PAINEL_PORTA:-80}
 
 # ── Portas dos serviços ─────────────────────────────────────────────────
 SQUID_PORTA_FWD=${SQUID_PORTA_FWD:-3127}
@@ -281,6 +284,25 @@ instalar_opcional() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$1" 2>/dev/null \
         && ok "Pacote opcional instalado: $1" \
         || aviso "Pacote opcional indisponível: $1"
+}
+
+# Quem está escutando numa porta TCP. Vazio se estiver livre.
+# Cobre 0.0.0.0:80, *:80, [::]:80 e IP:80.
+porta_em_uso() {
+    local porta="$1"
+    ss -lntp 2>/dev/null \
+        | awk -v p=":${porta}\$" 'NR>1 && $4 ~ p {print $NF}' \
+        | grep -oE '\(\("[^"]+' | sed 's/.*(("//' \
+        | sort -u | paste -sd ', ' - || true
+}
+
+# Primeira porta livre a partir da lista dada
+primeira_porta_livre() {
+    local p
+    for p in "$@"; do
+        [ -z "$(porta_em_uso "$p")" ] && { echo "$p"; return 0; }
+    done
+    return 1
 }
 
 svc_ativar()  { systemctl enable --now "$1" >/dev/null 2>&1 || systemctl enable --now "$1"; }
