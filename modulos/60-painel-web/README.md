@@ -30,10 +30,20 @@ a seção aparece na próxima página. Não há cadastro nem script de atualiza�
 Mostra o estado dos serviços de cada módulo, o `gwos.conf` em vigor e o comando
 de instalação dos que ainda faltam.
 
+## PHP: a versão da distribuição
+
+O módulo detecta qual PHP o Debian oferece e usa esse — Debian 12 traz **8.2**,
+Debian 13 traz **8.4**, e as duas servem. Só recorre ao repositório sury.org se
+a distribuição for antiga demais (abaixo de 8.1), porque é repositório de
+terceiros e uma dependência a mais para quebrar numa atualização.
+
+A versão escolhida vai para `PHP_VERSAO` no `gwos.conf`, e o painel usa isso
+para saber qual serviço monitorar. Fixar `php8.4-fpm` faria o painel reportar
+"parado" num Debian 12, onde o serviço se chama `php8.2-fpm`.
+
 ## O que faz
 
-- Adiciona o repositório sury.org (o PHP 8.4 não existe nos repos do Debian 13)
-- Instala Nginx e PHP 8.4 com as extensões usadas pelo painel
+- Instala Nginx e PHP com as extensões usadas pelo painel
 - Publica o site em `public/`, com `try_files` para o front controller
 - Gera o `.env` a partir de `/etc/gwos/db.conf`
 - Cria `/etc/sudoers.d/gwos` — só para os scripts que existem — e **valida com

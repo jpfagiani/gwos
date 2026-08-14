@@ -16,7 +16,7 @@ exigir_root
 titulo "══ Removendo o módulo 00-base ══"
 
 aviso "Isto pode derrubar a rede desta máquina."
-confirmar "Continuar?" || { echo "Cancelado."; exit 0; }
+confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 BACKUP=$(ls -1t /etc/network/interfaces.bak.* 2>/dev/null | head -1 || true)
 if [ -n "$BACKUP" ]; then

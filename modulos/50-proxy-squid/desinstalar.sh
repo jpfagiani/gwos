@@ -15,7 +15,7 @@ titulo "══ Removendo o módulo 50-proxy-squid ══"
 
 aviso "A LAN passa a navegar sem filtro de conteúdo."
 aviso "A CA do SSL Bump será apagada — os clientes precisarão de uma nova depois."
-confirmar "Continuar?" || { echo "Cancelado."; exit 0; }
+confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 svc_parar squid
 rm -f  /etc/squid/squid.conf
@@ -26,11 +26,7 @@ ok "Configuração, listas e CA removidas."
 REPO="$(raiz_projeto || true)"
 [ -n "$REPO" ] && rm -f "${REPO}/public/gwos-ca.crt"
 
-if confirmar "Remover também os pacotes do Squid?"; then
-    DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq squid squid-openssl sarg 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null || true
-    ok "Squid removido."
-fi
+remover_pacotes squid squid-openssl sarg
 
 desregistrar_modulo proxy-squid
 

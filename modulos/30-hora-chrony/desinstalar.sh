@@ -14,21 +14,19 @@ exigir_root
 titulo "══ Removendo o módulo 30-hora-chrony ══"
 
 aviso "A LAN perde o servidor de hora deste gateway."
-confirmar "Continuar?" || { echo "Cancelado."; exit 0; }
+confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 rm -f /etc/chrony/conf.d/gwos.conf
 desregistrar_modulo hora-chrony
 
-if confirmar "Remover também o pacote chrony?"; then
-    svc_parar chrony
-    DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq chrony 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null || true
-    systemctl enable --now systemd-timesyncd 2>/dev/null || true
-    ok "chrony removido; systemd-timesyncd reativado para o relógio local."
-else
-    systemctl restart chrony 2>/dev/null || true
-    aviso "chrony mantido, mas sem as configurações do GWOS."
-fi
+# O chrony é o relógio da máquina: pacote_em_uso sempre o protege, e a
+# remoção fica como decisão explícita fora do desinstalador.
+aviso "O pacote chrony NÃO será removido — é o relógio desta máquina."
+echo  "      Sem ele o horário deriva e a autenticação de domínio falha."
+echo  "      Para remover mesmo assim: apt-get remove --purge chrony"
+echo  "      (ative antes o systemd-timesyncd, ou a máquina fica sem hora)"
+systemctl restart chrony 2>/dev/null || true
+aviso "chrony mantido, sem as configurações do GWOS."
 
 integrar --silencioso
 ok "Módulo 30-hora-chrony removido."

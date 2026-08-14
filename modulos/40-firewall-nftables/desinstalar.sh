@@ -15,7 +15,7 @@ titulo "══ Removendo o módulo 40-firewall-nftables ══"
 
 aviso "O gateway deixa de mascarar (NAT) e de filtrar — a LAN perde a internet"
 aviso "e a máquina fica sem firewall."
-confirmar "Continuar?" || { echo "Cancelado."; exit 0; }
+confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 nft flush ruleset 2>/dev/null || true
 svc_parar nftables
@@ -24,11 +24,7 @@ rm -f /etc/sysctl.d/91-gwos-firewall.conf
 rm -f /usr/local/sbin/gwos-gerar-nftables
 ok "Regras e gerador removidos."
 
-if confirmar "Remover também o pacote nftables?"; then
-    DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq nftables 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null || true
-    ok "nftables removido."
-fi
+remover_pacotes nftables
 
 desregistrar_modulo firewall-nftables
 integrar --silencioso

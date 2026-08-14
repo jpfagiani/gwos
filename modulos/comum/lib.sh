@@ -146,6 +146,10 @@ DNS_FORWARDERS="${DNS_FORWARDERS:-10.14.8.20 10.14.8.16 10.1.6.222 8.8.8.8 8.8.4
 NTP_SERVIDORES="${NTP_SERVIDORES:-10.14.8.20}"
 NTP_POOL="${NTP_POOL:-pool.ntp.br}"
 
+# ── Painel ──────────────────────────────────────────────────────────────
+# Versão do PHP em uso, detectada da distribuição pelo módulo 60-painel-web.
+PHP_VERSAO=${PHP_VERSAO:-}
+
 # ── Portas dos serviços ─────────────────────────────────────────────────
 SQUID_PORTA_FWD=${SQUID_PORTA_FWD:-3127}
 SQUID_PORTA=${SQUID_PORTA:-3128}
@@ -283,6 +287,210 @@ svc_ativar()  { systemctl enable --now "$1" >/dev/null 2>&1 || systemctl enable 
 svc_parar()   { systemctl stop "$1" 2>/dev/null || true; systemctl disable "$1" 2>/dev/null || true; }
 svc_ativo()   { systemctl is-active --quiet "$1"; }
 
+# ----------------------------------------------------------------------------
+# Remoção segura de pacotes
+# ----------------------------------------------------------------------------
+# O GWOS costuma dividir a máquina com outras coisas — um portal atrás do mesmo
+# nginx, um banco de outra aplicação, o dnsmasq do libvirt. Remover o pacote
+# nesses casos derruba o vizinho. Estas funções detectam uso por terceiros e
+# então o desinstalador nem oferece a remoção.
+#
+# MOTIVO_USO recebe a explicação quando o pacote está em uso.
+# ----------------------------------------------------------------------------
+MOTIVO_USO=""
+
+# ----------------------------------------------------------------------------
+# Versão do PHP
+# ----------------------------------------------------------------------------
+# Cada Debian traz uma versão diferente (bookworm: 8.2, trixie: 8.4). Usar a do
+# próprio sistema evita depender do repositório sury.org, que é de terceiros e
+# uma fonte a mais para quebrar numa atualização.
+# ----------------------------------------------------------------------------
+PHP_MINIMO="8.1"     # abaixo disto o painel não roda
+
+# Versão que o apt oferece nesta distribuição (ex.: 8.2 no Debian 12)
+detectar_php_disponivel() {
+    local v
+    # O metapacote 'php' aponta para a versão padrão da distribuição
+    v=$(apt-cache depends php 2>/dev/null \
+        | sed -n 's/.*Depends: php\([0-9]\+\.[0-9]\+\).*/\1/p' | head -1)
+    if [ -n "$v" ]; then echo "$v"; return 0; fi
+
+    for v in 8.4 8.3 8.2 8.1; do
+        apt-cache show "php${v}" >/dev/null 2>&1 && { echo "$v"; return 0; }
+    done
+    return 1
+}
+
+# Versão já instalada nesta máquina
+detectar_php_instalado() {
+    local d v
+    for d in /etc/php/*/fpm; do
+        [ -d "$d" ] || continue
+        v=$(basename "$(dirname "$d")")
+        echo "$v"
+        return 0
+    done
+    return 1
+}
+
+# php_versao_suficiente <tem> <minimo> — 0 se 'tem' >= 'minimo'
+php_versao_suficiente() {
+    local a="${1%%.*}" b="${1##*.}" c="${2%%.*}" d="${2##*.}"
+    [ "$a" -gt "$c" ] && return 0
+    [ "$a" -lt "$c" ] && return 1
+    [ "$b" -ge "$d" ]
+}
+
+# Sites do nginx que não são o do GWOS
+nginx_outros_sites() {
+    local n=0
+    if [ -d /etc/nginx/sites-enabled ]; then
+        n=$(find /etc/nginx/sites-enabled -maxdepth 1 \( -type f -o -type l \) \
+              ! -name 'gwos' 2>/dev/null | wc -l)
+    fi
+    if [ -d /etc/nginx/conf.d ]; then
+        n=$(( n + $(find /etc/nginx/conf.d -maxdepth 1 -name '*.conf' \
+              ! -name 'gwos*' 2>/dev/null | wc -l) ))
+    fi
+    echo "$n"
+}
+
+# Bancos que não são do GWOS
+mariadb_outros_bancos() {
+    mysql -sNe "SHOW DATABASES" 2>/dev/null \
+        | grep -vxE 'information_schema|performance_schema|mysql|sys|gwos' \
+        | paste -sd ', ' - || true
+}
+
+# pacote_em_uso <pacote> → 0 se há indício de uso por outra coisa
+pacote_em_uso() {
+    local pkg="$1" n outros
+    MOTIVO_USO=""
+
+    case "$pkg" in
+        nginx*)
+            n=$(nginx_outros_sites)
+            if [ "${n:-0}" -gt 0 ]; then
+                MOTIVO_USO="há ${n} site(s) além do GWOS em /etc/nginx"
+                return 0
+            fi ;;
+
+        php*)
+            n=$(nginx_outros_sites)
+            if [ "${n:-0}" -gt 0 ]; then
+                MOTIVO_USO="outros sites do nginx podem depender do PHP"
+                return 0
+            fi
+            if [ -d /etc/apache2/sites-enabled ] && \
+               [ -n "$(ls -A /etc/apache2/sites-enabled 2>/dev/null)" ]; then
+                MOTIVO_USO="há sites do Apache nesta máquina"
+                return 0
+            fi ;;
+
+        mariadb*|mysql*)
+            outros=$(mariadb_outros_bancos)
+            if [ -n "$outros" ]; then
+                MOTIVO_USO="há outros bancos de dados: ${outros}"
+                return 0
+            fi ;;
+
+        dnsmasq*)
+            if [ -d /etc/libvirt ] || ip link show virbr0 &>/dev/null; then
+                MOTIVO_USO="o libvirt usa dnsmasq para as redes virtuais"
+                return 0
+            fi
+            n=$(find /etc/dnsmasq.d -maxdepth 1 -type f ! -name 'gwos.conf' 2>/dev/null | wc -l)
+            if [ "${n:-0}" -gt 0 ]; then
+                MOTIVO_USO="há outras configurações em /etc/dnsmasq.d"
+                return 0
+            fi ;;
+
+        chrony*)
+            MOTIVO_USO="é o relógio desta máquina — sem ele o horário deriva"
+            return 0 ;;
+
+        nftables*)
+            if command -v docker >/dev/null 2>&1 || [ -d /etc/libvirt ]; then
+                MOTIVO_USO="Docker ou libvirt dependem do nftables para suas redes"
+                return 0
+            fi ;;
+
+        bind9*)
+            if [ -s /etc/bind/named.conf.zonas-locais ] && \
+               grep -qE '^\s*zone\s' /etc/bind/named.conf.zonas-locais 2>/dev/null; then
+                MOTIVO_USO="há zonas suas em /etc/bind/named.conf.zonas-locais"
+                return 0
+            fi ;;
+    esac
+
+    # Genérico: a remoção arrastaria outros pacotes instalados?
+    local colateral
+    colateral=$(LC_ALL=C apt-get -s remove "$pkg" 2>/dev/null \
+        | awk '/^The following packages will be REMOVED/{f=1;next} /^[A-Z]/{f=0} f' \
+        | tr -s ' \n' ' ' | sed 's/^ *//;s/ *$//')
+    if [ -n "$colateral" ]; then
+        local extras
+        extras=$(echo "$colateral" | tr ' ' '\n' | grep -vx "$pkg" | paste -sd ', ' -)
+        if [ -n "$extras" ]; then
+            MOTIVO_USO="removê-lo levaria junto: ${extras}"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+# remover_pacotes <pkg>...
+# Só oferece a remoção dos que não estão em uso por terceiros. Os demais são
+# mantidos, com o motivo na tela — não há pergunta a responder errado.
+remover_pacotes() {
+    local pkg seguros=() bloqueados=()
+
+    for pkg in "$@"; do
+        dpkg -l "$pkg" 2>/dev/null | grep -q '^ii' || continue
+        if pacote_em_uso "$pkg"; then
+            bloqueados+=("${pkg}|${MOTIVO_USO}")
+        else
+            seguros+=("$pkg")
+        fi
+    done
+
+    if [ ${#bloqueados[@]} -gt 0 ]; then
+        echo ""
+        aviso "Pacotes MANTIDOS porque outra coisa nesta máquina depende deles:"
+        for pkg in "${bloqueados[@]}"; do
+            printf "      %-18s %s\n" "${pkg%%|*}" "${pkg#*|}"
+        done
+        echo ""
+    fi
+
+    if [ ${#seguros[@]} -eq 0 ]; then
+        info "Nenhum pacote exclusivo do GWOS a remover."
+        return 0
+    fi
+
+    # Sem pergunta: quem mandou desinstalar já decidiu. O que protege o
+    # vizinho é a checagem de uso acima, não uma confirmação a mais.
+    info "Removendo: ${seguros[*]}"
+    DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq "${seguros[@]}" 2>/dev/null || true
+    apt-get autoremove -y -qq 2>/dev/null || true
+    ok "Removidos: ${seguros[*]}"
+}
+
+# Para um serviço só se ele for exclusivo do GWOS. Serviço compartilhado
+# (nginx com outros sites) é apenas recarregado, para o vizinho não cair.
+svc_parar_se_exclusivo() {
+    local svc="$1" motivo="$2"
+    if [ -n "$motivo" ]; then
+        systemctl reload "$svc" 2>/dev/null || systemctl restart "$svc" 2>/dev/null || true
+        aviso "${svc} mantido em execução — ${motivo}"
+    else
+        svc_parar "$svc"
+        ok "${svc} parado e desabilitado."
+    fi
+}
+
 backup_arquivo() {
     [ -f "$1" ] || return 0
     cp -a "$1" "${1}.bak.$(date +%Y%m%d%H%M%S)"
@@ -294,10 +502,25 @@ perguntar() {
     printf -v "$__var" '%s' "${__resp:-$__padrao}"
 }
 
+# Com GWOS_SEM_PERGUNTAS=1 responde "sim" sozinho. Os desinstaladores usam isso
+# para perguntar UMA vez no começo e depois seguir até o fim: quem decidiu
+# desinstalar não quer confirmar cada passo.
 confirmar() {
     local resp
+    if [ "${GWOS_SEM_PERGUNTAS:-0}" = "1" ]; then
+        echo "  $1 [s/N]: s  (automático)"
+        return 0
+    fi
     read -rp "  $1 [s/N]: " resp
     [[ "${resp:-N}" =~ ^[Ss]$ ]]
+}
+
+# Pergunta uma única vez e, a partir daí, o módulo segue sem interrupções.
+confirmar_uma_vez() {
+    [ "${GWOS_SEM_PERGUNTAS:-0}" = "1" ] && return 0
+    confirmar "$1" || return 1
+    export GWOS_SEM_PERGUNTAS=1
+    return 0
 }
 
 # ----------------------------------------------------------------------------

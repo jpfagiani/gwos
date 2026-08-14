@@ -14,7 +14,10 @@ carregar_conf
 FALHAS=0
 titulo "── Verificação: 60-painel-web ──"
 
-for SVC in nginx php8.4-fpm; do
+PHP_VER="$(detectar_php_instalado || echo '')"
+[ -n "$PHP_VER" ] && ok "PHP instalado: ${PHP_VER}" || falha "Nenhum PHP-FPM encontrado em /etc/php."
+
+for SVC in nginx ${PHP_VER:+php${PHP_VER}-fpm}; do
     if svc_ativo "$SVC"; then ok "Serviço ${SVC} ativo."
     else falha "Serviço ${SVC} parado."; FALHAS=$((FALHAS+1)); fi
 done

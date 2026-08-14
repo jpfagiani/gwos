@@ -18,7 +18,7 @@ aviso "Isto APAGA o banco 'gwos' — grupos, IPs, domínios, horários, relatór
 if [ -x /usr/local/sbin/gwos-backup ] || [ -f "$(raiz_projeto 2>/dev/null)/scripts/backup.sh" ]; then
     aviso "Faça um backup antes: gwos backup criar"
 fi
-confirmar "Continuar?" || { echo "Cancelado."; exit 0; }
+confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 mysql -e "DROP DATABASE IF EXISTS gwos;"       2>/dev/null || true
 mysql -e "DROP USER IF EXISTS 'gwos'@'localhost';" 2>/dev/null || true
@@ -26,13 +26,12 @@ ok "Banco e usuário removidos."
 
 rm -f "$GWOS_DB_CONF" /usr/local/sbin/gwos-senha-padrao
 
-if confirmar "Remover também o pacote mariadb-server?"; then
-    svc_parar mariadb
-    DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq mariadb-server 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null || true
-    ok "MariaDB removido."
+# Só oferece a remoção se nenhum outro banco existir nesta máquina.
+if pacote_em_uso mariadb-server; then
+    aviso "MariaDB mantido — ${MOTIVO_USO}."
 else
-    aviso "MariaDB mantido (outros bancos podem estar em uso)."
+    remover_pacotes mariadb-server
+    dpkg -l mariadb-server 2>/dev/null | grep -q '^ii' || svc_parar mariadb
 fi
 
 desregistrar_modulo banco-mariadb

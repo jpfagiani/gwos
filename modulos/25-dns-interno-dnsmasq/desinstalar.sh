@@ -15,7 +15,7 @@ carregar_conf
 titulo "══ Removendo o módulo 25-dns-interno-dnsmasq ══"
 
 aviso "Os nomes internos (${DOMINIO_LOCAL:-domínio local}) deixam de resolver."
-confirmar "Continuar?" || { echo "Cancelado."; exit 0; }
+confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 svc_parar gwos-dnsmasq
 rm -f /etc/systemd/system/gwos-dnsmasq.service
@@ -26,11 +26,7 @@ rmdir /etc/gwos/modelos 2>/dev/null || true
 systemctl daemon-reload
 ok "Serviço e configuração removidos."
 
-if confirmar "Remover também o pacote dnsmasq?"; then
-    DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq dnsmasq 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null || true
-    ok "dnsmasq removido."
-fi
+remover_pacotes dnsmasq
 
 aviso "As entradas de nomes continuam em /etc/hosts — remova à mão se quiser."
 

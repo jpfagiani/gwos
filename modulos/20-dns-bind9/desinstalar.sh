@@ -15,7 +15,7 @@ carregar_conf
 titulo "══ Removendo o módulo 20-dns-bind9 ══"
 
 aviso "A LAN perde o resolver e o bloqueio de domínios por DNS."
-confirmar "Continuar?" || { echo "Cancelado."; exit 0; }
+confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 svc_parar named
 rm -f /etc/bind/db.rpz.gwos \
@@ -31,11 +31,7 @@ if [ -f /etc/bind/named.conf.zonas-locais ]; then
     aviso "Mantido: /etc/bind/named.conf.zonas-locais (suas zonas)."
 fi
 
-if confirmar "Remover também os pacotes bind9?"; then
-    DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y -qq bind9 bind9-utils 2>/dev/null || true
-    apt-get autoremove -y -qq 2>/dev/null || true
-    ok "BIND9 removido."
-fi
+remover_pacotes bind9 bind9-utils
 
 # Devolve o gateway a um resolver externo, senão a máquina fica sem DNS
 if grep -q '^nameserver 127.0.0.1' /etc/resolv.conf 2>/dev/null; then

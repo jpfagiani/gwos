@@ -2,8 +2,8 @@
 # ============================================================================
 # GWOS — Módulo 60-painel-web: painel de administração
 # ============================================================================
-# Instala o Nginx + PHP-FPM 8.4, publica o painel, cria o comando 'gwos', as
-# permissões sudo dos scripts e as tarefas de cron.
+# Instala o Nginx + PHP-FPM (a versão da própria distribuição), publica o
+# painel, cria o comando 'gwos', as permissões sudo e as tarefas de cron.
 #
 # Depende do módulo 10-banco-mariadb (é dele que o painel lê tudo).
 # Junto:   é por aqui que grupos, IPs, domínios, horários e NAT são editados;
@@ -45,33 +45,50 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Repositório do PHP 8.4 (não existe nos repos padrão do Debian 13)
+# PHP — usa a versão da própria distribuição
 # ---------------------------------------------------------------------------
-if ! apt-cache show php8.4 &>/dev/null; then
-    info "Adicionando o repositório PHP 8.4 (sury.org)..."
+# Debian 12 traz 8.2, Debian 13 traz 8.4. Qualquer uma serve para o painel.
+# O repositório sury.org só entra em cena se o Debian for antigo demais — é de
+# terceiros, e uma fonte a menos é uma coisa a menos para quebrar.
+apt_update_uma_vez
+PHP_VER="$(detectar_php_disponivel || echo '')"
+
+if [ -n "$PHP_VER" ] && php_versao_suficiente "$PHP_VER" "$PHP_MINIMO"; then
+    ok "PHP ${PHP_VER} disponível no Debian $(. /etc/os-release 2>/dev/null; echo "${VERSION_ID:-?}") — sem repositório extra."
+else
+    aviso "PHP da distribuição ${PHP_VER:-ausente} é inferior ao mínimo ${PHP_MINIMO}."
+    info "Adicionando o repositório PHP (sury.org)..."
     instalar_pacotes curl gnupg2 lsb-release ca-certificates apt-transport-https
     curl -fsSL https://packages.sury.org/php/apt.gpg \
         | gpg --dearmor -o /etc/apt/trusted.gpg.d/php-sury.gpg
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" \
         > /etc/apt/sources.list.d/php-sury.list
     apt-get update -qq
-    ok "Repositório PHP 8.4 adicionado."
+    PHP_VER="$(detectar_php_disponivel || echo '8.4')"
+    ok "Repositório sury.org adicionado — PHP ${PHP_VER}."
 fi
 
 instalar_pacotes nginx \
-    php8.4 php8.4-fpm php8.4-mysql php8.4-mbstring \
-    php8.4-curl php8.4-zip php8.4-xml php8.4-intl \
+    "php${PHP_VER}" "php${PHP_VER}-fpm" "php${PHP_VER}-mysql" "php${PHP_VER}-mbstring" \
+    "php${PHP_VER}-curl" "php${PHP_VER}-zip" "php${PHP_VER}-xml" "php${PHP_VER}-intl" \
     tar gzip unzip
 
 # ---------------------------------------------------------------------------
 # PHP-FPM
 # ---------------------------------------------------------------------------
-PHP_INI="/etc/php/8.4/fpm/php.ini"
+PHP_INI="/etc/php/${PHP_VER}/fpm/php.ini"
+[ -f "$PHP_INI" ] || erro "php.ini não encontrado em ${PHP_INI} — instalação do PHP falhou."
 sed -i "s|;date.timezone.*|date.timezone = America/Sao_Paulo|" "$PHP_INI"
 sed -i "s|upload_max_filesize.*|upload_max_filesize = 64M|"    "$PHP_INI"
 sed -i "s|post_max_size.*|post_max_size = 64M|"                "$PHP_INI"
-svc_ativar php8.4-fpm
-ok "PHP-FPM configurado."
+svc_ativar "php${PHP_VER}-fpm"
+
+PHP_SOCK="/run/php/php${PHP_VER}-fpm.sock"
+ok "PHP-FPM ${PHP_VER} configurado (${PHP_SOCK})."
+
+# Guarda a versão no estado compartilhado — o painel usa para saber qual
+# serviço monitorar, e o desinstalador para saber o que remover.
+salvar_conf PHP_VERSAO "$PHP_VER"
 
 # ---------------------------------------------------------------------------
 # Nginx
@@ -88,7 +105,7 @@ server {
     }
 
     location ~ \.php\$ {
-        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+        fastcgi_pass unix:${PHP_SOCK};
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
         include fastcgi_params;
     }

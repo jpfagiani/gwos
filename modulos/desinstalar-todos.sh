@@ -37,6 +37,10 @@ echo -e "\n${BOLD}${RED}ATENÇÃO: isto remove o GWOS desta máquina.${NC}\n"
 [ ${#SELECIONADOS[@]} -gt 0 ] && echo -e "  Módulos: ${BOLD}${SELECIONADOS[*]}${NC}\n"
 confirmar "Confirma?" || { echo "Cancelado."; exit 0; }
 
+# A partir daqui, sem mais perguntas: os módulos removem tudo o que é do GWOS
+# e mantêm apenas os pacotes que outra coisa nesta máquina usa.
+export GWOS_SEM_PERGUNTAS=1
+
 for m in "${ORDEM[@]}"; do
     selecionado "$m" || continue
     [ -f "${MOD_DIR}/${m}/desinstalar.sh" ] || continue

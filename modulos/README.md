@@ -180,6 +180,36 @@ Dois módulos precisam do repositório completo: o `10-banco-mariadb`
 
 ---
 
+## Desinstalar
+
+```bash
+bash modulos/50-proxy-squid/desinstalar.sh   # um servidor
+bash modulos/desinstalar-todos.sh            # tudo
+```
+
+Pergunta **uma vez** e depois vai até o fim, sem confirmação a cada passo.
+
+**Pacotes compartilhados não são removidos.** Antes de desinstalar qualquer
+pacote, o script verifica se outra coisa na máquina depende dele — e, se
+depender, nem oferece: mantém e explica na tela.
+
+| Pacote | Mantido quando |
+|--------|----------------|
+| `nginx` | há outros sites em `/etc/nginx/sites-enabled` |
+| `php*` | há outros sites do nginx ou do Apache |
+| `mariadb-server` | existe outro banco além do `gwos` |
+| `dnsmasq` | o libvirt usa dnsmasq nas redes virtuais |
+| `nftables` | Docker ou libvirt estão instalados |
+| `chrony` | sempre — é o relógio da máquina |
+| qualquer um | a remoção arrastaria outros pacotes junto |
+
+O serviço também é poupado: se o nginx ainda serve outro site, o desinstalador
+remove só o vhost do GWOS e **recarrega** em vez de parar.
+
+O que nunca é apagado: os backups em `/var/lib/gwos/backups` e as zonas em
+`/etc/bind/named.conf.zonas-locais`. São seus dados, não resíduo — o script
+mostra o caminho e o comando para apagar, se você quiser.
+
 ## Reinstalar / reaplicar
 
 Os instaladores são reexecutáveis. O que é preservado numa reinstalação:

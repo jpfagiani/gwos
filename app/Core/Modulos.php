@@ -96,7 +96,9 @@ class Modulos
             'secao'    => 'Sistema',
             'rota'     => null,
             'tela'     => false,   // vira true quando a tela do modulo existir
-            'servicos' => ['nginx', 'php8.4-fpm'],
+            // O serviço do PHP muda com a distribuição (php8.2-fpm no Debian
+            // 12, php8.4-fpm no 13) — resolvido em instalados().
+            'servicos' => ['nginx', 'php-fpm'],
             'resumo'   => 'Este painel',
         ],
     ];
@@ -121,6 +123,7 @@ class Modulos
             }
             $meta['marcador']     = $marcador;
             $meta['instalado_em'] = self::lerCampo($arquivo, 'instalado_em');
+            $meta['servicos']     = self::resolverServicos($meta['servicos']);
             $lista[$marcador]     = $meta;
         }
 
@@ -197,6 +200,47 @@ class Modulos
     public static function temBanco(): bool
     {
         return self::temModulo('banco-mariadb') && is_readable('/etc/gwos/db.conf');
+    }
+
+    /**
+     * Substitui nomes de serviço genéricos pelo nome real desta máquina.
+     * Hoje só o PHP-FPM precisa disso: o Debian 12 traz php8.2-fpm e o 13
+     * traz php8.4-fpm, e fixar a versão faria o painel reportar "parado"
+     * para um serviço que nem existe com aquele nome.
+     *
+     * @param string[] $servicos
+     * @return string[]
+     */
+    private static function resolverServicos(array $servicos): array
+    {
+        $resolvidos = [];
+        foreach ($servicos as $servico) {
+            if ($servico !== 'php-fpm') {
+                $resolvidos[] = $servico;
+                continue;
+            }
+            $versao = self::versaoPhp();
+            if ($versao !== null) {
+                $resolvidos[] = "php{$versao}-fpm";
+            }
+        }
+        return $resolvidos;
+    }
+
+    /** Versão do PHP-FPM instalada, de /etc/gwos/gwos.conf ou de /etc/php. */
+    public static function versaoPhp(): ?string
+    {
+        $versao = Estado::obter('PHP_VERSAO');
+        if ($versao !== null && $versao !== '') {
+            return $versao;
+        }
+
+        foreach (glob('/etc/php/*/fpm') ?: [] as $dir) {
+            return basename(dirname($dir));
+        }
+
+        // Último recurso: a versão do próprio processo que está servindo o painel
+        return PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
     }
 
     private static function lerCampo(string $arquivo, string $campo): ?string
