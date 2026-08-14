@@ -42,4 +42,14 @@ return [
         'duracao' => 7200,  // 2 horas
     ],
 
+    'sistema' => [
+        // Derivado do próprio projeto, não fixo em /opt/gwos: o repositório
+        // pode ser clonado em qualquer lugar (/opt/dns, /srv/gateway...) e os
+        // controllers chamam estes scripts por caminho absoluto via sudo.
+        // O sudoers é gerado pelo módulo 60-painel-web com o mesmo caminho.
+        'raiz'        => dirname(__DIR__),
+        'scripts_dir' => dirname(__DIR__) . '/scripts',
+        'modulos_dir' => dirname(__DIR__) . '/modulos',
+    ],
+
 ];

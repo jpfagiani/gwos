@@ -14,7 +14,7 @@ integram sozinhos.
 
 ```bash
 apt install -y git
-git clone https://github.com/jpfagiani/gwos.git /opt/gwos
+git clone https://github.com/jpfagiani/dns.git /opt/gwos
 cd /opt/gwos
 
 # Tudo, na ordem

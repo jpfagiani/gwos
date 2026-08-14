@@ -48,7 +48,7 @@ GWOS_MODULOS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Raiz do projeto GWOS (repositório) — vazio se o módulo foi copiado sozinho
 raiz_projeto() {
     local d
-    for d in "${GWOS_MODULOS_DIR}/.." "/opt/gwos" "/var/www/gwos"; do
+    for d in "${GWOS_MODULOS_DIR}/.." "/opt/gwos" "/opt/dns" "/var/www/gwos"; do
         [ -f "${d}/public/index.php" ] && { (cd "$d" && pwd); return 0; }
     done
     return 1

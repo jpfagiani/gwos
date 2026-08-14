@@ -22,7 +22,7 @@
 ```bash
 # 1. Instalar git e clonar o repositório
 apt install -y git
-git clone https://github.com/jpfagiani/gwos.git /opt/gwos
+git clone https://github.com/jpfagiani/dns.git /opt/gwos
 cd /opt/gwos/install
 
 # 2. Executar o instalador

@@ -13,10 +13,14 @@ if [ -L "/usr/local/bin/gwos" ]; then
     GWOS_DIR="$(dirname "$(readlink -f /usr/local/bin/gwos)")"
     GWOS_DIR="$(cd "$GWOS_DIR/.." && pwd)"
 fi
-# Fallback: procura .env
-for D in /opt/gwos /srv/gwos "$HOME/gwos"; do
-    [ -f "$D/.env" ] && GWOS_DIR="$D" && break
-done
+# Fallback: só entra em ação se o caminho resolvido acima não servir. Antes
+# este laço rodava sempre e um /opt/gwos antigo vencia o link simbólico —
+# o repositório pode estar em qualquer diretório (/opt/dns, /srv/gateway...).
+if [ ! -f "$GWOS_DIR/.env" ]; then
+    for D in /opt/gwos /opt/dns /srv/gwos "$HOME/gwos"; do
+        [ -f "$D/.env" ] && GWOS_DIR="$D" && break
+    done
+fi
 
 ENV_FILE="$GWOS_DIR/.env"
 [ -f "$ENV_FILE" ] || { echo "ERRO: .env não encontrado (procurado em $GWOS_DIR)"; exit 1; }
@@ -516,7 +520,7 @@ cmd_update() {
     # Verifica se é repositório git
     if ! git -C "$REPO" rev-parse --is-inside-work-tree &>/dev/null; then
         erro "Diretório $REPO não é um repositório git."
-        echo "  Clone o repositório primeiro: git clone https://github.com/jpfagiani/gwos $REPO"
+        echo "  Clone o repositório do GWOS em $REPO antes de atualizar."
         exit 1
     fi
 
