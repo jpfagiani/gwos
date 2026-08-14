@@ -41,6 +41,31 @@ echo ""
 mapfile -t IFACES < <(listar_ifaces)
 [ ${#IFACES[@]} -gt 0 ] || erro "Nenhuma interface de rede encontrada."
 
+# ---------------------------------------------------------------------------
+# Uma placa só: esta máquina não pode ser gateway, e o 00-base não se aplica.
+# Sai com código 2 — o instalar-todos entende como "não aplicável", não falha.
+# ---------------------------------------------------------------------------
+if [ ${#IFACES[@]} -lt 2 ]; then
+    echo ""
+    aviso "Esta máquina tem uma única interface de rede (${IFACES[0]})."
+    echo ""
+    echo "  O módulo 00-base configura o roteamento entre a internet (WAN) e a"
+    echo "  rede interna (LAN). Isso exige duas placas — é o módulo de gateway."
+    echo ""
+    echo -e "  ${BOLD}Se este servidor é só DNS, hora, proxy ou painel, você não precisa dele.${NC}"
+    echo "  Os demais módulos detectam a rede sozinhos e não encostam no"
+    echo "  /etc/network/interfaces:"
+    echo ""
+    echo -e "    ${BOLD}bash ${GWOS_MODULOS_DIR}/20-dns-bind9/instalar.sh${NC}"
+    echo -e "    ${BOLD}bash ${GWOS_MODULOS_DIR}/30-hora-chrony/instalar.sh${NC}"
+    echo ""
+    echo "  Se a segunda placa existe mas não apareceu, verifique o firmware"
+    echo "  (ip -br link) e reexecute este módulo."
+    echo ""
+    info "Módulo 00-base não se aplica — nada foi alterado."
+    exit 2
+fi
+
 printf "  %-4s %-14s %-22s %-8s %s\n" "Nº" "Interface" "IP/Máscara" "Status" "Velocidade"
 echo "  ──────────────────────────────────────────────────────────────"
 IDX=1
@@ -97,7 +122,15 @@ for iface in "${IFACES[@]}"; do
     [ "$iface" != "$IFACE_WAN" ] && { LAN_AUTO="$iface"; break; }
 done
 IFACE_LAN=$(selecionar_iface "Interface LAN" "$LAN_AUTO")
-[ "$IFACE_LAN" = "$IFACE_WAN" ] && erro "WAN e LAN não podem ser a mesma interface."
+if [ "$IFACE_LAN" = "$IFACE_WAN" ]; then
+    echo ""
+    aviso "WAN e LAN não podem ser a mesma interface — um gateway roteia de uma"
+    aviso "placa para a outra."
+    echo "  Interfaces disponíveis: ${IFACES[*]}"
+    echo "  Se esta máquina não é gateway, pule o 00-base e instale só os"
+    echo "  serviços que você precisa (DNS, hora, proxy, painel)."
+    exit 1
+fi
 ok "LAN: $IFACE_LAN"
 
 # ===========================================================================

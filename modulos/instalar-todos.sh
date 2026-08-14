@@ -6,7 +6,8 @@
 # continua instalável sozinho, e este script apenas os executa em sequência.
 #
 #   bash instalar-todos.sh                  # tudo
-#   bash instalar-todos.sh 20-dns-bind9 50-proxy-squid   # só os listados
+#   bash instalar-todos.sh --escolher       # pergunta módulo a módulo
+#   bash instalar-todos.sh 20-dns-bind9 30-hora-chrony   # só os listados
 #   bash instalar-todos.sh --pular 00-base  # tudo menos os listados
 #   bash instalar-todos.sh --listar         # mostra a ordem e sai
 # ============================================================================
@@ -28,9 +29,20 @@ ORDEM=(
     60-painel-web
 )
 
+declare -A DESCRICAO=(
+    [00-base]="Rede do gateway — exige DUAS placas de rede"
+    [10-banco-mariadb]="Banco de dados (necessário para grupos, domínios, horários)"
+    [20-dns-bind9]="Servidor DNS da rede, com bloqueio por domínio"
+    [25-dns-interno-dnsmasq]="Nomes internos da LAN (portal, samba...)"
+    [30-hora-chrony]="Servidor de hora (NTP) para a rede"
+    [40-firewall-nftables]="Firewall e NAT — exige duas placas de rede"
+    [50-proxy-squid]="Proxy HTTP/HTTPS com filtro de conteúdo"
+    [60-painel-web]="Painel web de administração"
+)
+
 if [ "${1:-}" = "--listar" ]; then
     echo "Ordem de instalação:"
-    for m in "${ORDEM[@]}"; do echo "  $m"; done
+    for m in "${ORDEM[@]}"; do printf "  %-24s %s\n" "$m" "${DESCRICAO[$m]}"; done
     exit 0
 fi
 
@@ -38,10 +50,58 @@ exigir_root
 
 PULAR=()
 SELECIONADOS=()
-if [ "${1:-}" = "--pular" ]; then
-    shift; PULAR=("$@")
-elif [ $# -gt 0 ]; then
-    SELECIONADOS=("$@")
+ESCOLHER=0
+
+case "${1:-}" in
+    --escolher) ESCOLHER=1 ;;
+    --pular)    shift; PULAR=("$@") ;;
+    "")         ;;
+    *)          SELECIONADOS=("$@") ;;
+esac
+
+# ---------------------------------------------------------------------------
+# Uma placa só: os módulos de gateway não se aplicam. Avisa antes de começar,
+# em vez de deixar o 00-base falhar no meio da instalação.
+# ---------------------------------------------------------------------------
+NUM_IFACES=$(listar_ifaces | grep -c . || true)
+if [ "${NUM_IFACES:-0}" -lt 2 ] && [ "$ESCOLHER" = "0" ] && [ ${#SELECIONADOS[@]} -eq 0 ]; then
+    echo ""
+    aviso "Esta máquina tem ${NUM_IFACES} interface de rede."
+    echo "  Os módulos de gateway (00-base e 40-firewall-nftables) precisam de duas"
+    echo "  e serão pulados. Os serviços — DNS, hora, proxy, painel — funcionam"
+    echo "  normalmente com uma placa só."
+    echo ""
+    if confirmar "Escolher quais módulos instalar?"; then
+        ESCOLHER=1
+    else
+        PULAR=(00-base 40-firewall-nftables)
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Seleção interativa
+# ---------------------------------------------------------------------------
+if [ "$ESCOLHER" = "1" ]; then
+    titulo "── Escolha dos módulos ──"
+    echo ""
+    echo "  Responda s para instalar, Enter para pular."
+    echo ""
+    for m in "${ORDEM[@]}"; do
+        echo -e "  ${BOLD}${m}${NC}"
+        echo "    ${DESCRICAO[$m]}"
+        if confirmar "Instalar?"; then
+            SELECIONADOS+=("$m")
+        fi
+        echo ""
+    done
+
+    if [ ${#SELECIONADOS[@]} -eq 0 ]; then
+        echo "Nenhum módulo escolhido. Nada a fazer."
+        exit 0
+    fi
+    echo -e "  Serão instalados: ${BOLD}${SELECIONADOS[*]}${NC}"
+    echo ""
+    confirmar "Confirma?" || { echo "Cancelado."; exit 0; }
 fi
 
 pular() {
@@ -62,19 +122,25 @@ echo -e "${BOLD}${CYAN}═══════════════════
 
 FALHOU=()
 INSTALADOS=()
+PULADOS=()
 
 for m in "${ORDEM[@]}"; do
     selecionado "$m" || continue
-    pular "$m" && { aviso "Pulando ${m}."; continue; }
+    pular "$m" && { aviso "Pulando ${m}."; PULADOS+=("$m"); continue; }
     [ -f "${MOD_DIR}/${m}/instalar.sh" ] || { aviso "Módulo ${m} não encontrado — pulando."; continue; }
 
-    if bash "${MOD_DIR}/${m}/instalar.sh"; then
-        INSTALADOS+=("$m")
-    else
-        FALHOU+=("$m")
-        falha "Módulo ${m} falhou."
-        confirmar "Continuar com os próximos módulos?" || break
-    fi
+    bash "${MOD_DIR}/${m}/instalar.sh"
+    CODIGO=$?
+
+    case "$CODIGO" in
+        0)  INSTALADOS+=("$m") ;;
+        2)  # O módulo decidiu que não se aplica a esta máquina (ex.: 00-base
+            # numa máquina de uma placa só). Não é erro — segue em frente.
+            PULADOS+=("$m") ;;
+        *)  FALHOU+=("$m")
+            falha "Módulo ${m} falhou (código ${CODIGO})."
+            confirmar "Continuar com os próximos módulos?" || break ;;
+    esac
 done
 
 # Passe final de integração: agora que todos existem, refaz as amarrações
@@ -91,11 +157,20 @@ fi
 echo -e "${BOLD}${CYAN}══════════════════════════════════════════════${NC}"
 echo ""
 
+[ ${#INSTALADOS[@]} -gt 0 ] && echo -e "  Instalados  : ${BOLD}${INSTALADOS[*]}${NC}"
+[ ${#PULADOS[@]}   -gt 0 ] && echo -e "  Pulados     : ${PULADOS[*]}"
+
 carregar_conf
-echo -e "  Painel      : ${BOLD}http://${IP_GATEWAY:-?}${NC}"
-echo -e "  Login       : ${BOLD}admin@gwos.local${NC}   Senha: ${BOLD}gwos@2025${NC}"
-echo -e "  Interfaces  : WAN ${BOLD}${IFACE_WAN:-?}${NC}  |  LAN ${BOLD}${IFACE_LAN:-?}${NC}"
-echo -e "  Rede LAN    : ${BOLD}${REDE_LAN:-?}${NC}"
+if [ ${#PULADOS[@]} -gt 0 ] && [[ " ${PULADOS[*]} " == *" 00-base "* ]]; then
+    echo -e "  Endereço    : ${BOLD}${IP_GATEWAY:-?}${NC} em ${BOLD}${IFACE_LAN:-?}${NC} (rede já existente, não alterada)"
+else
+    echo -e "  Interfaces  : WAN ${BOLD}${IFACE_WAN:-?}${NC}  |  LAN ${BOLD}${IFACE_LAN:-?}${NC}"
+    echo -e "  Rede LAN    : ${BOLD}${REDE_LAN:-?}${NC}"
+fi
+if [[ " ${INSTALADOS[*]} " == *" 60-painel-web "* ]]; then
+    echo -e "  Painel      : ${BOLD}http://${IP_GATEWAY:-?}${NC}"
+    echo -e "  Login       : ${BOLD}admin@gwos.local${NC}   Senha: ${BOLD}gwos@2025${NC}"
+fi
 if tem_ssl_bump; then
     echo -e "  Certificado : ${BOLD}http://${IP_GATEWAY}/gwos-ca.crt${NC} — instale nos clientes"
 fi

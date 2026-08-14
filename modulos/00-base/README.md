@@ -15,6 +15,13 @@ que ele grava.
 - Liga o encaminhamento de pacotes em `/etc/sysctl.d/90-gwos-base.conf`
 - Grava `/etc/gwos/gwos.conf`
 
+## Exige duas placas de rede
+
+Este módulo roteia da internet (WAN) para a rede interna (LAN) — são duas
+interfaces diferentes, por definição. Numa máquina de uma placa só ele detecta,
+**não altera nada** e sai com código 2 (não aplicável, não é erro), indicando os
+módulos que fazem sentido ali.
+
 ## Instalação
 
 ```bash
@@ -24,6 +31,8 @@ bash instalar.sh
 É opcional: sem ele, cada módulo detecta a rede sozinho e cria o
 `gwos.conf` com os valores encontrados, sem mexer em `/etc/network/interfaces`.
 Instale-o quando esta máquina for de fato o gateway.
+
+Servidor de DNS, hora, proxy ou painel **não precisa deste módulo**.
 
 ## Depois
 

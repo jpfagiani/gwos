@@ -5,8 +5,14 @@ DNS numa máquina, só o proxy em outra, ou todos no mesmo gateway — o resulta
 é o mesmo de antes, mas dá para montar por partes.
 
 ```bash
-# Tudo, na ordem (equivale ao instalador antigo)
+# Escolher módulo a módulo (recomendado na primeira vez)
+bash modulos/instalar-todos.sh --escolher
+
+# Tudo, na ordem — gateway completo
 bash modulos/instalar-todos.sh
+
+# Só os que você quer
+bash modulos/instalar-todos.sh 20-dns-bind9 30-hora-chrony
 
 # Um servidor isolado
 bash modulos/20-dns-bind9/instalar.sh
@@ -14,6 +20,17 @@ bash modulos/20-dns-bind9/instalar.sh
 # Conferir o que está instalado
 bash modulos/verificar-todos.sh
 ```
+
+## Quantas placas de rede você precisa
+
+| Módulos | Placas |
+|---------|--------|
+| `00-base` e `40-firewall-nftables` | **duas** — são os módulos de gateway, que roteiam de uma para a outra |
+| DNS, nomes internos, hora, proxy, banco, painel | **uma** basta |
+
+Numa máquina de uma placa só, o `instalar-todos.sh` avisa antes de começar e
+pula os dois módulos de gateway. O `00-base` executado direto também detecta e
+sai sem alterar nada, dizendo quais módulos usar no lugar.
 
 ---
 

@@ -136,8 +136,14 @@ Cada servidor tem sua própria pasta em `modulos/`, com `instalar.sh`,
 | `60-painel-web` | Painel de administração |
 
 ```bash
+# Escolher módulo a módulo (recomendado na primeira vez)
+bash modulos/instalar-todos.sh --escolher
+
 # Só o servidor DNS, nesta máquina
 bash modulos/20-dns-bind9/instalar.sh
+
+# Só os módulos listados
+bash modulos/instalar-todos.sh 20-dns-bind9 30-hora-chrony
 
 # Tudo menos a reconfiguração de rede
 bash modulos/instalar-todos.sh --pular 00-base
@@ -148,6 +154,12 @@ bash modulos/verificar-todos.sh
 # Remover um servidor sem tocar nos outros
 bash modulos/50-proxy-squid/desinstalar.sh
 ```
+
+**Quantas placas de rede.** Só o `00-base` e o `40-firewall-nftables` precisam
+de duas — são os módulos de gateway, que roteiam de uma interface para a outra.
+DNS, nomes internos, hora, proxy, banco e painel funcionam com uma placa só.
+Numa máquina de uma interface, o instalador avisa antes de começar e pula os
+dois módulos de gateway.
 
 **Como eles funcionam isolados.** Nenhum módulo depende do instalador para
 descobrir a rede: quem precisa da LAN, da rede ou do domínio interno lê
