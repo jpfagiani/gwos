@@ -21,7 +21,8 @@ svc_parar named
 rm -f /etc/bind/db.rpz.gwos \
       /etc/bind/named.conf.local \
       /etc/bind/named.conf.options \
-      /etc/bind/named.conf.gwos-integracao
+      /etc/bind/named.conf.gwos-integracao \
+      /etc/bind/named.conf.gwos-forwarders
 rm -rf /var/log/named
 ok "Configurações do GWOS removidas do BIND9."
 

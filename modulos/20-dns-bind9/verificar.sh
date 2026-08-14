@@ -26,6 +26,23 @@ else
     falha "RPZ declarada mas NÃO ativada — bloqueio por DNS não funciona."; FALHAS=$((FALHAS+1))
 fi
 
+if [ -f /etc/bind/named.conf.gwos-forwarders ]; then
+    FWD=$(grep -oE '^\s+[0-9.]+;' /etc/bind/named.conf.gwos-forwarders | tr -d ' ;' | paste -sd ' ' -)
+    ok "Forwarders: ${FWD:-nenhum}"
+    # Um resolver interno que responda NXDOMAIN para domínio externo derruba
+    # a resolução: o BIND aceita NXDOMAIN como resposta e não tenta o próximo.
+    if command -v dig >/dev/null 2>&1; then
+        for D in $FWD; do
+            R=$(dig +short +time=2 +tries=1 google.com "@${D}" 2>/dev/null | grep -cE '^[0-9]' || true)
+            [ "${R:-0}" -gt 0 ] && ok "  ${D} resolve domínio externo." \
+                                || falha "  ${D} NÃO resolveu google.com — se for o mais rápido, quebra a internet."
+        done
+    fi
+else
+    falha "Ausente: /etc/bind/named.conf.gwos-forwarders (rode gwos-integrar)."
+    FALHAS=$((FALHAS+1))
+fi
+
 if command -v dig >/dev/null 2>&1; then
     if dig +short +time=3 +tries=1 google.com @127.0.0.1 2>/dev/null | grep -qE '^[0-9]'; then
         ok "Resolução externa OK (google.com via 127.0.0.1)."

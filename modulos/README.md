@@ -69,11 +69,12 @@ e reescreve **só os pontos de contato**:
 
 | Ponto de contato | Arquivo gerado | Condição |
 |------------------|----------------|----------|
+| BIND9 → upstream | `/etc/bind/named.conf.gwos-forwarders` | lista de `DNS_FORWARDERS` do `gwos.conf` |
 | BIND9 → dnsmasq | `/etc/bind/named.conf.gwos-integracao` | domínio interno encaminhado só se o módulo 25 existir |
 | Squid → resolver | `/etc/squid/conf.d/gwos_integracao.conf` | `127.0.0.1` com BIND9; resolvers externos sem ele |
 | Squid → redes | `/etc/squid/conf.d/gwos_redes.conf` | ACLs vindas de `gwos.conf` (cobre faixas fora do RFC 1918) |
 | nftables | `/etc/nftables.conf` | redireciona 80/443 só se houver Squid; DNS só se houver BIND9 |
-| chrony | `/etc/chrony/conf.d/gwos.conf` | libera as redes internas atuais |
+| chrony | `/etc/chrony/conf.d/gwos.conf` | fontes de `NTP_SERVIDORES`/`NTP_POOL` + libera as redes internas atuais |
 
 Por isso a ordem não trava nada: instale o Squid depois do firewall e o
 firewall se reajusta sozinho; remova o Squid e os redirecionamentos somem

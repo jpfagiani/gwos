@@ -135,6 +135,17 @@ REDE2_MASK=${REDE2_MASK:-255.255.255.0}
 # ── Nomes internos ──────────────────────────────────────────────────────
 DOMINIO_LOCAL=${DOMINIO_LOCAL:-cdpni.local}
 
+# ── Resolvers upstream do BIND9 (ordem: internos, depois públicos) ──────
+# Os domínios internos do governo têm encaminhamento fixo por zona em
+# /etc/bind/named.conf.local — esta lista é para todo o resto.
+DNS_FORWARDERS="${DNS_FORWARDERS:-10.14.8.20 10.14.8.16 10.1.6.222 8.8.8.8 8.8.4.4 1.1.1.1}"
+
+# ── Fontes de hora do chrony ────────────────────────────────────────────
+# NTP_SERVIDORES é a fonte preferida (servidor interno da rede);
+# NTP_POOL é a reserva, para o relógio não derivar se ela cair.
+NTP_SERVIDORES="${NTP_SERVIDORES:-10.14.8.20}"
+NTP_POOL="${NTP_POOL:-pool.ntp.br}"
+
 # ── Portas dos serviços ─────────────────────────────────────────────────
 SQUID_PORTA_FWD=${SQUID_PORTA_FWD:-3127}
 SQUID_PORTA=${SQUID_PORTA:-3128}

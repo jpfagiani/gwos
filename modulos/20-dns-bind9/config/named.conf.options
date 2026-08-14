@@ -6,13 +6,12 @@
 options {
     directory "/var/cache/bind";
 
-    // Redireciona consultas externas para resolvers públicos confiáveis
-    forwarders {
-        8.8.8.8;
-        8.8.4.4;
-        1.1.1.1;
-    };
-    forward only;
+    // Resolvers upstream — gerado por gwos-integrar a partir de
+    // DNS_FORWARDERS em /etc/gwos/gwos.conf. Contém o bloco
+    // 'forwarders { ... }; forward only;'.
+    // Os domínios internos do governo NÃO passam por aqui: têm
+    // encaminhamento fixo por zona em named.conf.local.
+    include "/etc/bind/named.conf.gwos-forwarders";
 
     // Aceita consultas apenas da rede interna e do localhost.
     // "localnets" cobre automaticamente qualquer rede das interfaces locais —

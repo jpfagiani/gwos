@@ -19,7 +19,9 @@ else falha "Serviço chrony parado."; FALHAS=$((FALHAS+1)); fi
 
 if [ -f /etc/chrony/conf.d/gwos.conf ]; then
     ok "Configuração do GWOS presente."
-    echo "     Redes liberadas: $(grep '^allow' /etc/chrony/conf.d/gwos.conf | awk '{print $2}' | paste -sd ' ' -)"
+    echo "     Fonte preferida: $(grep '^server' /etc/chrony/conf.d/gwos.conf | awk '{print $2}' | paste -sd ' ' -)"
+    echo "     Reserva        : $(grep '^pool'   /etc/chrony/conf.d/gwos.conf | awk '{print $2}' | paste -sd ' ' -)"
+    echo "     Redes liberadas: $(grep '^allow'  /etc/chrony/conf.d/gwos.conf | awk '{print $2}' | paste -sd ' ' -)"
 else
     falha "Ausente: /etc/chrony/conf.d/gwos.conf (rode gwos-integrar)."; FALHAS=$((FALHAS+1))
 fi

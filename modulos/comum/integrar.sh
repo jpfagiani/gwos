@@ -52,6 +52,21 @@ fi
 if tem_bind9 && [ -d /etc/bind ]; then
     ARQ_INT="/etc/bind/named.conf.gwos-integracao"
 
+    # -- 1a. Resolvers upstream ----------------------------------------------
+    {
+        echo "// Gerado por gwos-integrar a partir de DNS_FORWARDERS"
+        echo "// em ${GWOS_CONF} — NÃO editar à mão."
+        echo "forwarders {"
+        for _dns in $DNS_FORWARDERS; do
+            echo "    ${_dns};"
+        done
+        echo "};"
+        echo "forward only;"
+    } > /etc/bind/named.conf.gwos-forwarders
+    chown bind:bind /etc/bind/named.conf.gwos-forwarders 2>/dev/null || true
+    _msg ok "BIND9 → forwarders: ${DNS_FORWARDERS}"
+
+    # -- 1b. Domínio interno --------------------------------------------------
     if tem_dnsmasq; then
         cat > "$ARQ_INT" <<ZONA
 // Gerado por gwos-integrar — NÃO editar à mão.
@@ -154,12 +169,24 @@ if tem_chrony && [ -d /etc/chrony ]; then
     mkdir -p /etc/chrony/conf.d
     {
         echo "# Gerado por gwos-integrar — NÃO editar à mão."
-        echo "# Fonte de tempo e clientes autorizados a sincronizar com este gateway."
-        echo "pool pool.ntp.br iburst prefer"
+        echo "# Fontes em NTP_SERVIDORES / NTP_POOL de ${GWOS_CONF}."
+        echo ""
+        echo "# Fonte preferida — servidor de hora interno da rede."
+        for _ntp in $NTP_SERVIDORES; do
+            echo "server ${_ntp} iburst prefer"
+        done
+        echo ""
+        echo "# Reserva — se a fonte interna cair, o relógio não deriva."
+        for _pool in $NTP_POOL; do
+            echo "pool ${_pool} iburst"
+        done
+        echo ""
+        echo "# Clientes autorizados a sincronizar com este gateway."
         for rede in $(redes_internas); do
             echo "allow ${rede}"
         done
-        echo "# Serve a hora local mesmo sem internet (gateway isolado)."
+        echo ""
+        echo "# Serve a hora local mesmo sem alcançar nenhuma fonte."
         echo "local stratum 10"
     } > /etc/chrony/conf.d/gwos.conf
 
@@ -169,7 +196,8 @@ if tem_chrony && [ -d /etc/chrony ]; then
         echo "confdir /etc/chrony/conf.d" >> /etc/chrony/chrony.conf
     fi
     svc_ativo chrony && systemctl restart chrony >/dev/null 2>&1 || true
-    _msg ok "chrony → clientes autorizados: $(redes_internas | tr '\n' ' ')"
+    _msg ok "chrony → fonte: ${NTP_SERVIDORES} (reserva: ${NTP_POOL})"
+    _msg ok "chrony → clientes autorizados: $(redes_internas)"
 fi
 
 # ---------------------------------------------------------------------------

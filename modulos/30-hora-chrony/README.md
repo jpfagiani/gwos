@@ -7,9 +7,27 @@ Mantém o relógio do gateway certo **e** serve a hora para as máquinas da LAN.
 - Instala o `chrony` e desativa o `systemd-timesyncd`
 - Define o fuso `America/Sao_Paulo`
 - `gwos-integrar` grava `/etc/chrony/conf.d/gwos.conf` com:
-  - `pool pool.ntp.br iburst prefer`
+  - `server <NTP_SERVIDORES> iburst prefer` — a fonte interna da rede
+  - `pool <NTP_POOL> iburst` — reserva, para o relógio não derivar se a fonte
+    interna cair
   - um `allow <rede>` para cada rede interna de `/etc/gwos/gwos.conf`
   - `local stratum 10`
+
+## Fontes de hora
+
+Vêm de `/etc/gwos/gwos.conf`. Padrão:
+
+```
+NTP_SERVIDORES="10.14.8.20"
+NTP_POOL="pool.ntp.br"
+```
+
+`NTP_SERVIDORES` aceita mais de um, separados por espaço. Depois de mudar,
+rode `gwos-integrar`.
+
+Apontar para o servidor interno é o certo quando ele é o controlador de
+domínio: a latência é menor e o relógio das estações precisa bater com o dele
+de qualquer forma. O pool público fica só como rede de segurança.
 
 > **Diferença em relação ao instalador antigo:** ele só ajustava o pool, sem
 > `allow` — o chrony ficava só sincronizando o próprio relógio e recusava os

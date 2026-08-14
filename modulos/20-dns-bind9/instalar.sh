@@ -47,11 +47,23 @@ else
     aviso "Zona RPZ existente preservada (/etc/bind/db.rpz.gwos)."
 fi
 
-# Placeholder do arquivo de integração — 'gwos-integrar' o regrava logo abaixo,
-# mas ele precisa existir antes do primeiro named-checkconf.
+# Arquivos de integração — 'gwos-integrar' os regrava logo abaixo, mas
+# precisam existir e ser válidos antes do primeiro named-checkconf.
 [ -f /etc/bind/named.conf.gwos-integracao ] || \
     echo "// Gerado por gwos-integrar." > /etc/bind/named.conf.gwos-integracao
-chown bind:bind /etc/bind/named.conf.gwos-integracao
+
+{
+    echo "// Gerado por gwos-integrar a partir de DNS_FORWARDERS em ${GWOS_CONF}."
+    echo "forwarders {"
+    for _dns in $DNS_FORWARDERS; do
+        echo "    ${_dns};"
+    done
+    echo "};"
+    echo "forward only;"
+} > /etc/bind/named.conf.gwos-forwarders
+
+chown bind:bind /etc/bind/named.conf.gwos-integracao /etc/bind/named.conf.gwos-forwarders
+ok "Resolvers upstream: ${DNS_FORWARDERS}"
 
 mkdir -p /var/log/named
 chown bind:bind /var/log/named
