@@ -371,7 +371,7 @@ nginx_outros_sites() {
     local n=0
     if [ -d /etc/nginx/sites-enabled ]; then
         n=$(find /etc/nginx/sites-enabled -maxdepth 1 \( -type f -o -type l \) \
-              ! -name 'gwos' ! -name 'default' 2>/dev/null | wc -l)
+              ! -name 'gwos' ! -name 'gwos-portal' ! -name 'default' 2>/dev/null | wc -l)
     fi
     if [ -d /etc/nginx/conf.d ]; then
         n=$(( n + $(find /etc/nginx/conf.d -maxdepth 1 -name '*.conf' \

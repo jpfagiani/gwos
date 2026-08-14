@@ -97,6 +97,11 @@ salvar_conf PHP_VERSAO "$PHP_VER"
 # máquina. Antes o instalador escrevia o vhost na 80 assim mesmo, o nginx -t
 # passava (a configuração é válida) e o serviço só falhava ao subir, com
 # "control process exited with error code" — sem dizer o motivo.
+#
+# Nome do site: convenção <servidor>-portal, para o portal web ficar amarrado
+# ao servidor que o hospeda — smb-portal, cdpni-portal, gwos-portal.
+SITE_NGINX="gwos-portal"
+
 SITES_EXISTENTES="$(nginx_outros_sites)"
 DONO_80="$(porta_em_uso "$PAINEL_PORTA")"
 PADRAO=" default_server"
@@ -136,14 +141,14 @@ fi
 if [ -n "$PADRAO" ] && \
    grep -rlq "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null; then
     OUTRO=$(grep -rl "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null \
-            | grep -v '/gwos$' | head -1)
+            | grep -vE "/(gwos|${SITE_NGINX})\$" | head -1)
     if [ -n "$OUTRO" ]; then
         PADRAO=""
         aviso "$(basename "$OUTRO") já é o default_server da porta ${PAINEL_PORTA} — o GWOS entra como vhost comum."
     fi
 fi
 
-cat > /etc/nginx/sites-available/gwos <<NGINX
+cat > /etc/nginx/sites-available/${SITE_NGINX} <<NGINX
 server {
     listen ${PAINEL_PORTA}${PADRAO};
     server_name _;
@@ -165,7 +170,14 @@ server {
 }
 NGINX
 
-ln -sf /etc/nginx/sites-available/gwos /etc/nginx/sites-enabled/gwos
+ln -sf "/etc/nginx/sites-available/${SITE_NGINX}" "/etc/nginx/sites-enabled/${SITE_NGINX}"
+
+# Instalação anterior usava o nome 'gwos'. Deixar os dois habilitados criaria
+# duas vezes o mesmo vhost na mesma porta.
+if [ "$SITE_NGINX" != "gwos" ] && [ -e /etc/nginx/sites-enabled/gwos ]; then
+    rm -f /etc/nginx/sites-enabled/gwos /etc/nginx/sites-available/gwos
+    info "Site antigo 'gwos' substituído por '${SITE_NGINX}'."
+fi
 
 # O 'default' de fábrica só sai quando o painel assume a porta 80 e não há
 # mais nada servido aqui. Numa máquina compartilhada ele fica: pode ter sido
@@ -191,7 +203,7 @@ if ! svc_ativar nginx; then
 fi
 systemctl reload nginx 2>/dev/null || true
 salvar_conf PAINEL_PORTA "$PAINEL_PORTA"
-ok "Nginx configurado na porta ${PAINEL_PORTA}."
+ok "Nginx configurado: site ${SITE_NGINX} na porta ${PAINEL_PORTA}."
 
 # ---------------------------------------------------------------------------
 # .env

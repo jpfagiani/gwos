@@ -18,11 +18,15 @@ confirmar_uma_vez "Continuar?" || { echo "Cancelado."; exit 0; }
 
 REPO="$(raiz_projeto || true)"
 
-# Remove SÓ o site do GWOS. Outros vhosts na mesma máquina (um portal, um
-# sistema interno) continuam servidos — por isso a configuração sai antes de
-# qualquer decisão sobre o serviço.
-rm -f /etc/nginx/sites-available/gwos /etc/nginx/sites-enabled/gwos
-ok "Site do GWOS removido do nginx."
+# Remove SÓ o site do painel. Outros vhosts na mesma máquina (o portal de
+# sistemas, um portal do Samba) continuam servidos — por isso a configuração
+# sai antes de qualquer decisão sobre o serviço.
+# Inclui o nome antigo 'gwos', de instalações feitas antes da convenção
+# <servidor>-portal.
+for _site in gwos-portal gwos; do
+    rm -f "/etc/nginx/sites-available/${_site}" "/etc/nginx/sites-enabled/${_site}"
+done
+ok "Site do painel removido do nginx."
 
 # O nginx só é parado se não houver mais nada sendo servido por ele.
 OUTROS_SITES=$(nginx_outros_sites)
