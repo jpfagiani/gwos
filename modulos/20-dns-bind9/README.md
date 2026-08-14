@@ -74,9 +74,22 @@ Na maioria das vezes **não é zona**. Decida assim:
 
 ### Criar uma zona
 
-Escreva em **`/etc/bind/named.conf.zonas-locais`** — o instalador cria esse
-arquivo uma vez e nunca mais o toca. O `named.conf.local` **é sobrescrito** a
-cada reinstalação do módulo; zona escrita lá se perde.
+Com o módulo `60-painel-web` instalado, pela tela **DNS** do painel. Ou pelo
+terminal:
+
+```bash
+gwos-zona listar
+gwos-zona adicionar sistema.sp.gov.br "10.1.6.222 10.14.8.16"
+gwos-zona remover   sistema.sp.gov.br
+```
+
+O `gwos-zona` valida o domínio e os IPs, roda `named-checkconf` **antes** de a
+alteração valer e desfaz sozinho se a configuração não passar. É o mesmo
+caminho que o painel usa — ele não escreve em `/etc/bind` por conta própria.
+
+Para escrever à mão, use **`/etc/bind/named.conf.zonas-locais`** — o instalador
+cria esse arquivo uma vez e nunca mais o toca. O `named.conf.local` **é
+sobrescrito** a cada reinstalação do módulo; zona escrita lá se perde.
 
 ```bash
 cat >> /etc/bind/named.conf.zonas-locais <<'EOF'

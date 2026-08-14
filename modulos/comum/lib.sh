@@ -311,6 +311,7 @@ instalar_ferramentas_comuns() {
     [ -f "${origem}/lib.sh" ]      && install -m 644 "${origem}/lib.sh"      "${GWOS_ETC}/lib.sh"
     [ -f "${origem}/integrar.sh" ] && install -m 755 "${origem}/integrar.sh" /usr/local/sbin/gwos-integrar
     [ -f "${origem}/definir.sh" ]  && install -m 755 "${origem}/definir.sh"  /usr/local/sbin/gwos-definir
+    [ -f "${origem}/zona.sh" ]     && install -m 755 "${origem}/zona.sh"     /usr/local/sbin/gwos-zona
     return 0
 }
 

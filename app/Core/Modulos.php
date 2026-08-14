@@ -45,7 +45,7 @@ class Modulos
             'icone'    => 'bi-signpost-split',
             'secao'    => 'Rede',
             'rota'     => '/modulos/dns',
-            'tela'     => false,   // vira true quando a tela do modulo existir
+            'tela'     => true,
             'servicos' => ['named'],
             'resumo'   => 'Resolvers, zonas e bloqueio por domínio',
         ],

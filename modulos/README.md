@@ -88,9 +88,21 @@ Estado e registro:
 /etc/gwos/modulos.d/<nome> um arquivo por módulo instalado
 /etc/gwos/lib.sh           cópia da biblioteca comum
 /usr/local/sbin/gwos-integrar        re-costura tudo
+/usr/local/sbin/gwos-definir         altera uma chave do gwos.conf, com validação
+/usr/local/sbin/gwos-zona            zonas de encaminhamento do BIND9
 /usr/local/sbin/gwos-gerar-nftables  regera o firewall
 /usr/local/sbin/gwos-gerar-dnsmasq   regera o dnsmasq
 /usr/local/sbin/gwos-senha-padrao    senha inicial do painel
+```
+
+O `gwos-definir` é o único caminho de escrita que o painel web tem no
+`gwos.conf`: lista fechada de chaves, validador por chave, e `gwos-integrar` no
+final. Interfaces, IP do gateway e rede ficam de fora de propósito — trocar IP
+é `gwos ip`, que valida com `ifquery` e põe o IP novo antes de tirar o antigo.
+
+```bash
+gwos-definir --listar
+gwos-definir DNS_FORWARDERS "8.8.8.8 1.1.1.1"
 ```
 
 ---

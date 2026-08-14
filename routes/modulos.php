@@ -8,3 +8,13 @@
  */
 
 $router->get('/modulos', 'ModuloController@index');
+
+// --- 20-dns-bind9 ---------------------------------------------------------
+// As rotas existem sempre; o DnsController devolve 404 se o módulo não estiver
+// instalado, e o menu só mostra o link quando ele está.
+$router->get ('/modulos/dns',                    'DnsController@index');
+$router->post('/modulos/dns/forwarders',         'DnsController@salvarForwarders');
+$router->post('/modulos/dns/zonas',              'DnsController@adicionarZona');
+$router->post('/modulos/dns/zonas/{dominio}/remover', 'DnsController@removerZona');
+$router->get ('/modulos/dns/testar',             'DnsController@testar');
+$router->get ('/modulos/dns/testar-forwarders',  'DnsController@testarForwarders');
