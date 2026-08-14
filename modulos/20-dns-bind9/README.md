@@ -101,6 +101,23 @@ local — assim ela vai junto no git.
 bash instalar.sh
 ```
 
+### Antes de instalar em um servidor que já existe
+
+O instalador aborta se a porta 53 estiver ocupada, mas vale conferir antes:
+
+```bash
+ss -lnup | grep :53
+```
+
+- **Samba como controlador de domínio (AD DC)** tem DNS próprio na 53. Não
+  instale o BIND9 nessa máquina — use outra para o DNS. Samba como servidor de
+  arquivos (membro ou standalone) não usa a 53 e não dá conflito.
+- **systemd-resolved** ocupa a 53 em `127.0.0.53`: `systemctl disable --now systemd-resolved`.
+
+Se o `/etc/resolv.conf` estiver imutável (`chattr +i`, comum em servidor para o
+DHCP não sobrescrever), o módulo detecta, não força e imprime os três comandos
+para você trocar à mão.
+
 ## Sozinho
 
 Resolver completo para a LAN. Os bloqueios podem ser editados à mão em

@@ -115,21 +115,54 @@ ok "Diretório de log criado."
 named-checkconf || erro "named-checkconf reprovou a configuração — nada foi iniciado."
 ok "Configuração validada."
 
+# ---------------------------------------------------------------------------
+# Porta 53 já ocupada? (Samba AD DC, systemd-resolved, dnsmasq padrão, Pi-hole)
+# ---------------------------------------------------------------------------
+DONO_53=$(ss -lnpu 2>/dev/null | awk '$5 ~ /:53$/ {print $NF}' | grep -o 'users:(("[^"]*' \
+          | sed 's/.*(("//' | sort -u | grep -v '^named$' | paste -sd ', ' - || true)
+if [ -n "${DONO_53:-}" ]; then
+    aviso "A porta 53 já está em uso por: ${DONO_53}"
+    if systemctl is-active --quiet systemd-resolved; then
+        aviso "systemd-resolved detectado — desative-o antes:"
+        echo  "      systemctl disable --now systemd-resolved"
+    fi
+    case "$DONO_53" in
+        *samba*|*smbd*)
+            aviso "Servidor Samba como controlador de domínio (AD DC) tem DNS próprio."
+            aviso "Nesse caso NÃO instale o BIND9 aqui — use outra máquina para o DNS." ;;
+    esac
+    erro "Libere a porta 53 e reexecute este módulo."
+fi
+
 svc_ativar named
 ok "BIND9 ativo na porta 53."
 
 # ---------------------------------------------------------------------------
 # O gateway passa a resolver por si mesmo
 # ---------------------------------------------------------------------------
-if [ ! -L /etc/resolv.conf ] && ! grep -q '^nameserver 127.0.0.1' /etc/resolv.conf 2>/dev/null; then
-    backup_arquivo /etc/resolv.conf
-    { echo "# Gerado pelo módulo 20-dns-bind9 do GWOS"
-      echo "nameserver 127.0.0.1"
-      echo "search ${DOMINIO_LOCAL}"
-    } > /etc/resolv.conf
-    ok "/etc/resolv.conf aponta para o BIND9 local."
+if [ -L /etc/resolv.conf ]; then
+    aviso "/etc/resolv.conf é link simbólico (systemd-resolved?) — não alterado."
+    aviso "Aponte-o para 127.0.0.1 à mão se quiser que esta máquina use o BIND9 local."
+elif lsattr /etc/resolv.conf 2>/dev/null | awk '{print $1}' | grep -q 'i'; then
+    # Alguns servidores marcam o resolv.conf como imutável para o DHCP não
+    # sobrescrever. Sem este teste o redirecionamento abaixo aborta o script.
+    aviso "/etc/resolv.conf está imutável (chattr +i) — não alterado."
+    echo  "      Para apontar esta máquina ao BIND9 local:"
+    echo  "        chattr -i /etc/resolv.conf"
+    echo  "        printf 'nameserver 127.0.0.1\\nsearch ${DOMINIO_LOCAL}\\n' > /etc/resolv.conf"
+    echo  "        chattr +i /etc/resolv.conf"
+elif grep -q '^nameserver 127.0.0.1' /etc/resolv.conf 2>/dev/null; then
+    ok "/etc/resolv.conf já aponta para o BIND9 local."
 else
-    aviso "/etc/resolv.conf não alterado (link simbólico ou já configurado)."
+    backup_arquivo /etc/resolv.conf
+    if { echo "# Gerado pelo módulo 20-dns-bind9 do GWOS"
+         echo "nameserver 127.0.0.1"
+         echo "search ${DOMINIO_LOCAL}"
+       } > /etc/resolv.conf 2>/dev/null; then
+        ok "/etc/resolv.conf aponta para o BIND9 local."
+    else
+        aviso "Não foi possível escrever /etc/resolv.conf — deixado como estava."
+    fi
 fi
 
 registrar_modulo dns-bind9
