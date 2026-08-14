@@ -1,11 +1,12 @@
 // ============================================================
-// GWOS — BIND9 Zonas Locais
+// GWOS — BIND9 Zonas Locais (módulo 20-dns-bind9)
 // /etc/bind/named.conf.local
 // ============================================================
 
 // ---------------------------------------------------------
 // Zona RPZ — gerada automaticamente pelo GWOS
-// Arquivo atualizado pelo script aplicar_bind9_rpz.sh
+// Conteúdo atualizado por scripts/aplicar_bind9_rpz.sh (painel).
+// Ativada em named.conf.options pela diretiva response-policy.
 // ---------------------------------------------------------
 zone "rpz.gwos" {
     type master;
@@ -41,12 +42,9 @@ zone "prodesp.sp.gov.br" {
 };
 
 // ---------------------------------------------------------
-// Zona interna local — nomes da LAN (servidores, impressoras, etc.)
-// Resolvida pelo dnsmasq em 127.0.0.1:5353 via /etc/hosts.
-// Gerenciada pelo comando: gwos dns <add|update|del|list>
+// Integração com os demais módulos do GWOS.
+// Este arquivo é regravado por 'gwos-integrar' e contém o
+// encaminhamento do domínio interno para o dnsmasq (módulo
+// 25-dns-interno), quando ele estiver instalado.
 // ---------------------------------------------------------
-zone "cdpni.local" {
-    type forward;
-    forward only;
-    forwarders { 127.0.0.1 port 5353; };
-};
+include "/etc/bind/named.conf.gwos-integracao";

@@ -556,9 +556,12 @@ cmd_update() {
     done
     ok "Arquivos copiados para $WEB_DIR"
 
-    # Copia configurações de serviços (sem sobrescrever .env e arquivos locais)
-    if [ -f "$REPO/config/dnsmasq-gwos.conf" ]; then
-        cp "$REPO/config/dnsmasq-gwos.conf" /etc/dnsmasq.d/gwos.conf
+    # Reaplica as configurações de serviço que vêm dos módulos (dnsmasq, BIND9,
+    # Squid, nftables). Cada módulo tem seu próprio gerador; gwos-integrar
+    # chama todos com os parâmetros atuais de /etc/gwos/gwos.conf.
+    if [ -x /usr/local/sbin/gwos-integrar ]; then
+        /usr/local/sbin/gwos-integrar --silencioso
+        ok "Configurações de serviço reaplicadas (gwos-integrar)"
     fi
 
     # Ajusta permissões

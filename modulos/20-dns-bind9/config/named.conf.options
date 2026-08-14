@@ -1,3 +1,8 @@
+// ============================================================
+// GWOS — BIND9 (módulo 20-dns-bind9)
+// /etc/bind/named.conf.options
+// ============================================================
+
 options {
     directory "/var/cache/bind";
 
@@ -9,11 +14,18 @@ options {
     };
     forward only;
 
-    // Aceita consultas apenas da rede interna e localhost.
+    // Aceita consultas apenas da rede interna e do localhost.
     // "localnets" cobre automaticamente qualquer rede das interfaces locais —
     // não é preciso editar este arquivo ao trocar o IP do gateway.
     allow-query     { localhost; localnets; };
     allow-recursion { localhost; localnets; };
+
+    // ─────────────────────────────────────────────────────────
+    // RPZ — ativa a zona de política de resposta (bloqueio por domínio).
+    // Sem esta diretiva a zona rpz.gwos é carregada mas NUNCA aplicada.
+    // A zona em si é declarada em named.conf.local.
+    // ─────────────────────────────────────────────────────────
+    response-policy { zone "rpz.gwos"; } qname-wait-recurse no;
 
     // Segurança
     dnssec-validation no;
@@ -37,4 +49,5 @@ logging {
     };
     category default { default_log; };
     category queries { default_log; };
+    category rpz     { default_log; };
 };

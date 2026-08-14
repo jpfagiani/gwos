@@ -8,3 +8,10 @@
 *.md        text eol=lf
 *.txt       text eol=lf
 *.env       text eol=lf
+
+# Configurações de serviço dos módulos (extensões que não casam com as regras
+# acima). Sem isto o checkout no Windows pode gravar CRLF e o BIND9/dnsmasq
+# recusam o arquivo no Linux.
+named.conf.*        text eol=lf
+db.rpz.*            text eol=lf
+*.modelo            text eol=lf

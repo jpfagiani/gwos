@@ -29,6 +29,12 @@ cd /opt/gwos/install
 bash install.sh
 ```
 
+O `install.sh` é um atalho para `modulos/instalar-todos.sh` — a instalação foi
+desmembrada em módulos, um por servidor (DNS, hora, firewall, proxy, banco,
+painel). Instalar tudo de uma vez dá exatamente o mesmo resultado de antes;
+a diferença é que agora dá para instalar um servidor de cada vez. Veja a
+[seção 1.2](#12-instalação-por-módulos) e `modulos/README.md`.
+
 O instalador pergunta:
 - Interface WAN (saída para internet)
 - Interface LAN (rede interna)
@@ -112,6 +118,54 @@ Migrando da máquina virtual para a física:
 > lugar definitivo. Nunca mexa na rede de um gateway remoto sem um console
 > de socorro — se algo der errado na troca de IP, é o console físico que
 > salva (use `gwos ip`, nunca `systemctl restart networking`).
+
+### 1.2 Instalação por módulos
+
+Cada servidor tem sua própria pasta em `modulos/`, com `instalar.sh`,
+`verificar.sh`, `desinstalar.sh` e um `README.md` próprio:
+
+| Módulo | Serviço |
+|--------|---------|
+| `00-base` | Rede, firmware, `ip_forward`, estado compartilhado |
+| `10-banco-mariadb` | Banco de dados |
+| `20-dns-bind9` | Servidor DNS com RPZ |
+| `25-dns-interno-dnsmasq` | Nomes internos da LAN |
+| `30-hora-chrony` | Servidor de hora (NTP) |
+| `40-firewall-nftables` | Firewall e NAT |
+| `50-proxy-squid` | Proxy HTTP/HTTPS com SSL Bump |
+| `60-painel-web` | Painel de administração |
+
+```bash
+# Só o servidor DNS, nesta máquina
+bash modulos/20-dns-bind9/instalar.sh
+
+# Tudo menos a reconfiguração de rede
+bash modulos/instalar-todos.sh --pular 00-base
+
+# Diagnóstico de tudo que está instalado
+bash modulos/verificar-todos.sh
+
+# Remover um servidor sem tocar nos outros
+bash modulos/50-proxy-squid/desinstalar.sh
+```
+
+**Como eles funcionam isolados.** Nenhum módulo depende do instalador para
+descobrir a rede: quem precisa da LAN, da rede ou do domínio interno lê
+`/etc/gwos/gwos.conf`; se o arquivo não existir, ele é criado a partir do que
+o sistema já tem — sem tocar em `/etc/network/interfaces`. Só o `00-base`
+reconfigura a rede de verdade.
+
+**Como eles se encontram.** Ao terminar, todo módulo roda `gwos-integrar`, que
+olha o que existe na máquina e reescreve só os pontos de contato: o firewall
+só redireciona 80/443 se houver Squid, o Squid só resolve por `127.0.0.1` se
+houver BIND9, o BIND9 só encaminha o domínio interno se houver dnsmasq, e o
+chrony libera as redes internas atuais. Por isso a ordem não importa —
+instalar o Squid depois do firewall reajusta o firewall sozinho, e remover o
+Squid tira os redirecionamentos antes que a LAN fique sem internet.
+
+Só há uma dependência obrigatória: o **painel exige o banco**.
+
+Detalhes completos em [`modulos/README.md`](modulos/README.md).
 
 ---
 
@@ -369,16 +423,31 @@ gwos desbloqueio admin@gwos.local
 | `gwos-dnsmasq` | DNS interno para `.cdpni.local` |
 | `nftables` | Firewall e NAT |
 | `mariadb` | Banco de dados do painel |
+| `chrony` | Servidor de hora (NTP) da LAN |
 
 ```bash
 # Ver status de todos
 gwos status
+
+# Diagnóstico módulo a módulo (mais detalhado que o status)
+bash /opt/gwos/modulos/verificar-todos.sh
 
 # Reiniciar serviço individualmente
 systemctl restart squid
 systemctl restart nginx
 systemctl restart named
 ```
+
+### Arquivos de estado dos módulos
+
+| Caminho | Conteúdo |
+|---------|----------|
+| `/etc/gwos/gwos.conf` | Interfaces, redes, IP do gateway, domínio interno, portas |
+| `/etc/gwos/db.conf` | Credenciais do banco (0600) |
+| `/etc/gwos/modulos.d/` | Um arquivo por módulo instalado |
+| `/usr/local/sbin/gwos-integrar` | Re-costura as integrações entre os módulos |
+| `/usr/local/sbin/gwos-gerar-nftables` | Regera as regras de firewall |
+| `/usr/local/sbin/gwos-gerar-dnsmasq` | Regera a configuração do dnsmasq |
 
 ---
 

@@ -8,6 +8,11 @@ set -euo pipefail
 HOSTS_FILE="/etc/hosts"
 MARKER="# gwos-dns"   # identifica linhas gerenciadas pelo GWOS
 
+# Domínio interno definido pelo módulo 00-base (modulos/comum/lib.sh)
+DOMINIO_LOCAL="cdpni.local"
+# shellcheck disable=SC1091
+[ -f /etc/gwos/gwos.conf ] && . /etc/gwos/gwos.conf
+
 _reload() {
     # O serviço instalado pelo GWOS é gwos-dnsmasq (o dnsmasq padrão fica desativado)
     systemctl reload gwos-dnsmasq 2>/dev/null \
@@ -29,7 +34,7 @@ cmd_list() {
 
 cmd_add() {
     local ip="$1" host="$2"
-    local domain="${3:-cdpni.local}"
+    local domain="${3:-$DOMINIO_LOCAL}"
 
     if grep -qP "^\S+\s+${host}\s" "$HOSTS_FILE" 2>/dev/null || \
        grep -qP "^\S+\s+\S+\s+${host}($|\s)" "$HOSTS_FILE" 2>/dev/null; then
@@ -81,7 +86,7 @@ case "$SUBCMD" in
         cmd_list ;;
     add)
         [[ $# -ge 2 ]] || { echo "Uso: gwos dns add <host> <ip> [dominio]"; exit 1; }
-        cmd_add "$2" "$1" "${3:-cdpni.local}" ;;
+        cmd_add "$2" "$1" "${3:-$DOMINIO_LOCAL}" ;;
     update|change)
         [[ $# -ge 2 ]] || { echo "Uso: gwos dns update <host> <novo-ip>"; exit 1; }
         cmd_update "$1" "$2" ;;

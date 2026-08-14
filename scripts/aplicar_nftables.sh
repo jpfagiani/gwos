@@ -7,6 +7,17 @@ set -euo pipefail
 GWOS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ -f "$GWOS_DIR/.env" ]; then set -a; source "$GWOS_DIR/.env"; set +a; fi
 
+# Estado compartilhado dos módulos (modulos/comum/lib.sh) — serve de reserva
+# quando o banco não responde e diz quais servidores existem nesta máquina.
+if [ -f /etc/gwos/gwos.conf ]; then set -a; . /etc/gwos/gwos.conf; set +a; fi
+
+# Um módulo conta como presente pelo registro em /etc/gwos/modulos.d ou pelo
+# binário instalado — assim as regras nunca redirecionam para um serviço morto.
+_tem_modulo() { [ -f "/etc/gwos/modulos.d/$1" ]; }
+tem_squid() { _tem_modulo proxy-squid || { command -v squid >/dev/null 2>&1 && [ -f /etc/squid/squid.conf ]; }; }
+tem_bind9() { _tem_modulo dns-bind9   || command -v named >/dev/null 2>&1; }
+tem_ssl_bump() { [ -f /etc/squid/ssl_cert/gwos-ca.crt ]; }
+
 DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_BANCO="${DB_BANCO:-gwos}"
 DB_USUARIO="${DB_USUARIO:-gwos}"
@@ -23,13 +34,28 @@ mysql_q() {
 # ------------------------------------------------------------------
 # Lê configurações
 # ------------------------------------------------------------------
-IFACE_WAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_wan'")
-IFACE_LAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_lan'")
-REDE_LAN=$(mysql_q  "SELECT valor FROM configuracoes WHERE chave='rede_lan'")
-NAT_ATIVO=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='nat_ativo'")
-SQUID_PORTA=$(mysql_q  "SELECT valor FROM configuracoes WHERE chave='squid_porta'")
+# O banco é a fonte principal; /etc/gwos/gwos.conf cobre o caso de ele estar
+# fora do ar — sem isso, uma consulta vazia geraria regras com interface em
+# branco e derrubaria a rede.
+CONF_WAN="${IFACE_WAN:-}"; CONF_LAN="${IFACE_LAN:-}"; CONF_REDE="${REDE_LAN:-}"
+
+IFACE_WAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_wan'" || true)
+IFACE_LAN=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='iface_lan'" || true)
+REDE_LAN=$(mysql_q  "SELECT valor FROM configuracoes WHERE chave='rede_lan'"  || true)
+NAT_ATIVO=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='nat_ativo'" || true)
+SQUID_PORTA=$(mysql_q "SELECT valor FROM configuracoes WHERE chave='squid_porta'" || true)
+
+IFACE_WAN="${IFACE_WAN:-$CONF_WAN}"
+IFACE_LAN="${IFACE_LAN:-$CONF_LAN}"
+REDE_LAN="${REDE_LAN:-$CONF_REDE}"
+NAT_ATIVO="${NAT_ATIVO:-1}"
 SQUID_PORTA="${SQUID_PORTA:-3128}"
-SQUID_PORTA_SSL=3129   # porta ssl-bump (fixa)
+SQUID_PORTA_SSL="${SQUID_PORTA_SSL:-3129}"
+
+[ -n "$IFACE_WAN" ] && [ -n "$IFACE_LAN" ] || {
+    echo "ERRO: interfaces WAN/LAN não determinadas (banco vazio e /etc/gwos/gwos.conf ausente)."
+    exit 1
+}
 
 # ------------------------------------------------------------------
 # Gera listas de IPs por tipo
@@ -101,6 +127,33 @@ done
 [ -z "$RETURN_REDE_LAN" ] && RETURN_REDE_LAN="        # nenhuma rede local detectada na LAN"
 
 # ------------------------------------------------------------------
+# Redirecionamentos condicionais — só apontam para serviço que existe.
+# Numa instalação modular o Squid ou o BIND9 podem não estar presentes;
+# redirecionar para uma porta morta deixaria a LAN sem internet/DNS.
+# ------------------------------------------------------------------
+if tem_bind9; then
+    REGRA_DNS="        # Força DNS da LAN pelo BIND9 local (impede bypass de RPZ)
+        iif \"$IFACE_LAN\" udp dport 53 redirect
+        iif \"$IFACE_LAN\" tcp dport 53 redirect"
+else
+    REGRA_DNS="        # BIND9 ausente — DNS da LAN sai direto"
+fi
+
+if tem_squid; then
+    REGRA_PROXY="        # Proxy transparente — apenas tráfego saindo para internet
+        iif \"$IFACE_LAN\" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :${SQUID_PORTA}"
+    if tem_ssl_bump; then
+        REGRA_PROXY+="
+        iif \"$IFACE_LAN\" ip saddr != @ip_bypass_proxy tcp dport 443 redirect to :${SQUID_PORTA_SSL}"
+    else
+        REGRA_PROXY+="
+        # HTTPS não interceptado: Squid sem SSL Bump"
+    fi
+else
+    REGRA_PROXY="        # Squid ausente — HTTP/HTTPS saem direto"
+fi
+
+# ------------------------------------------------------------------
 # Elementos dos sets (evita bloco vazio que pode falhar no nft)
 # ------------------------------------------------------------------
 elem_set() { [ -n "$1" ] && echo "elements = { $1 }" || true; }
@@ -131,18 +184,14 @@ table ip gwos_nat {
 
         # 1:1 NAT — DNAT: IP público → IP interno
 ${NAT_DNAT}
-        # Força DNS da LAN pelo BIND9 local (impede bypass de RPZ)
-        iif "$IFACE_LAN" udp dport 53 redirect
-        iif "$IFACE_LAN" tcp dport 53 redirect
+${REGRA_DNS}
 
         # Redes locais do gateway (IP principal + aliases): roteia, não intercepta
 ${RETURN_REDE_LAN}
         # Demais redes internas alcançáveis por rota estática (faixas RFC 1918)
         iif "$IFACE_LAN" ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } return
 
-        # Proxy transparente — apenas tráfego saindo para internet
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 80 redirect to :${SQUID_PORTA}
-        iif "$IFACE_LAN" ip saddr != @ip_bypass_proxy tcp dport 443 redirect to :${SQUID_PORTA_SSL}
+${REGRA_PROXY}
     }
 
     chain postrouting {

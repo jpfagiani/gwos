@@ -1,0 +1,208 @@
+#!/bin/bash
+# ============================================================================
+# GWOS — Integração entre módulos
+# ============================================================================
+# Instalado como /usr/local/sbin/gwos-integrar.
+#
+# Cada módulo funciona sozinho. Este script é o que faz eles conversarem:
+# roda ao final de toda instalação/desinstalação de módulo, olha o que existe
+# na máquina naquele momento e regrava só os pontos de contato:
+#
+#   BIND9    → encaminha o domínio interno ao dnsmasq (se o dnsmasq existir)
+#   Squid    → resolve por 127.0.0.1 (se o BIND9 existir) ou pelo DNS externo
+#   Squid    → ACLs das redes internas vindas do /etc/gwos/gwos.conf
+#   nftables → redireciona 80/443 ao Squid (se o Squid existir) e
+#              DNS ao BIND9 (se o BIND9 existir)
+#   chrony   → libera as redes internas para sincronizar a hora
+#
+# Sem argumentos regrava tudo. Aceita: --silencioso
+# ============================================================================
+
+set -uo pipefail
+
+for _l in "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/lib.sh" \
+          "/etc/gwos/lib.sh"; do
+    # shellcheck disable=SC1090
+    [ -f "$_l" ] && { . "$_l"; break; }
+done
+[ -n "${GWOS_LIB_CARREGADA:-}" ] || {
+    echo "ERRO: comum/lib.sh não encontrado."; exit 1; }
+
+SILENCIOSO=0
+[ "${1:-}" = "--silencioso" ] && SILENCIOSO=1
+_msg() { [ "$SILENCIOSO" = "1" ] || "$@"; }
+
+exigir_root
+garantir_conf
+
+_msg titulo "══ Integração entre módulos ══"
+
+# ---------------------------------------------------------------------------
+# 0. dnsmasq — regera a configuração com o domínio/porta atuais
+# ---------------------------------------------------------------------------
+if tem_dnsmasq && [ -x /usr/local/sbin/gwos-gerar-dnsmasq ]; then
+    /usr/local/sbin/gwos-gerar-dnsmasq >/dev/null \
+        && _msg ok "dnsmasq → ${DOMINIO_LOCAL} em 127.0.0.1:${DNSMASQ_PORTA}" \
+        || falha "Falha ao regerar /etc/dnsmasq.d/gwos.conf."
+fi
+
+# ---------------------------------------------------------------------------
+# 1. BIND9 — encaminhamento do domínio interno para o dnsmasq
+# ---------------------------------------------------------------------------
+if tem_bind9 && [ -d /etc/bind ]; then
+    ARQ_INT="/etc/bind/named.conf.gwos-integracao"
+
+    if tem_dnsmasq; then
+        cat > "$ARQ_INT" <<ZONA
+// Gerado por gwos-integrar — NÃO editar à mão.
+// O domínio interno é resolvido pelo dnsmasq (módulo 25-dns-interno),
+// que escuta em 127.0.0.1:${DNSMASQ_PORTA}.
+zone "${DOMINIO_LOCAL}" {
+    type forward;
+    forward only;
+    forwarders { 127.0.0.1 port ${DNSMASQ_PORTA}; };
+};
+ZONA
+        _msg ok "BIND9 → dnsmasq: ${DOMINIO_LOCAL} encaminhado para 127.0.0.1:${DNSMASQ_PORTA}"
+    else
+        cat > "$ARQ_INT" <<ZONA
+// Gerado por gwos-integrar — NÃO editar à mão.
+// Módulo 25-dns-interno (dnsmasq) não instalado: nenhum encaminhamento
+// do domínio ${DOMINIO_LOCAL}. Instale-o para resolver nomes da LAN.
+ZONA
+        _msg info "BIND9 sozinho — sem resolução de nomes internos (${DOMINIO_LOCAL})."
+    fi
+
+    # Garante o include no named.conf.local
+    if [ -f /etc/bind/named.conf.local ] \
+       && ! grep -q 'named.conf.gwos-integracao' /etc/bind/named.conf.local; then
+        echo "include \"${ARQ_INT}\";" >> /etc/bind/named.conf.local
+    fi
+    chown bind:bind "$ARQ_INT" 2>/dev/null || true
+
+    if named-checkconf >/dev/null 2>&1; then
+        rndc reload >/dev/null 2>&1 || systemctl reload named >/dev/null 2>&1 || true
+    else
+        falha "named-checkconf reprovou a configuração — BIND9 não recarregado."
+        named-checkconf || true
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Squid — resolver e ACLs de rede
+# ---------------------------------------------------------------------------
+if tem_squid && [ -d /etc/squid ]; then
+    mkdir -p /etc/squid/conf.d
+
+    # -- 2a. Resolver DNS -----------------------------------------------------
+    if tem_bind9; then
+        DNS_SQUID="127.0.0.1"
+        DNS_ORIGEM="BIND9 local (RPZ ativo)"
+    else
+        DNS_SQUID=$(awk '/^nameserver/{print $2}' /etc/resolv.conf 2>/dev/null \
+                    | grep -v '^127\.' | head -2 | paste -sd ' ' -)
+        DNS_SQUID="${DNS_SQUID:-8.8.8.8 1.1.1.1}"
+        DNS_ORIGEM="resolvers externos (módulo 20-dns-bind9 ausente)"
+    fi
+
+    cat > /etc/squid/conf.d/gwos_integracao.conf <<SQINT
+# Gerado por gwos-integrar — NÃO editar à mão.
+# Resolver do Squid: ${DNS_ORIGEM}
+dns_nameservers ${DNS_SQUID}
+dns_defnames off
+SQINT
+    _msg ok "Squid → DNS: ${DNS_SQUID} (${DNS_ORIGEM})"
+
+    # -- 2b. ACLs das redes internas -----------------------------------------
+    {
+        echo "# Gerado por gwos-integrar a partir de ${GWOS_CONF} — NÃO editar à mão."
+        for rede in $(redes_internas); do
+            echo "acl localnet src ${rede}"
+        done
+        for rede in $(redes_internas); do
+            echo "acl rede_interna dst ${rede}"
+        done
+    } > /etc/squid/conf.d/gwos_redes.conf
+    _msg ok "Squid → redes internas: $(redes_internas | tr '\n' ' ')"
+
+    if squid -k parse >/dev/null 2>&1; then
+        svc_ativo squid && { squid -k reconfigure >/dev/null 2>&1 || true; }
+    else
+        falha "squid -k parse reprovou a configuração — Squid não recarregado."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 3. nftables — redirecionamentos condicionais
+# ---------------------------------------------------------------------------
+if tem_firewall; then
+    if [ -x /usr/local/sbin/gwos-gerar-nftables ]; then
+        if /usr/local/sbin/gwos-gerar-nftables >/dev/null; then
+            _msg ok "nftables regerado (proxy: $(tem_squid && echo sim || echo não), DNS local: $(tem_bind9 && echo sim || echo não))"
+        else
+            falha "Falha ao regerar as regras nftables."
+        fi
+    else
+        _msg aviso "gwos-gerar-nftables ausente — instale o módulo 40-firewall-nftables."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 4. chrony — libera as redes internas
+# ---------------------------------------------------------------------------
+if tem_chrony && [ -d /etc/chrony ]; then
+    mkdir -p /etc/chrony/conf.d
+    {
+        echo "# Gerado por gwos-integrar — NÃO editar à mão."
+        echo "# Fonte de tempo e clientes autorizados a sincronizar com este gateway."
+        echo "pool pool.ntp.br iburst prefer"
+        for rede in $(redes_internas); do
+            echo "allow ${rede}"
+        done
+        echo "# Serve a hora local mesmo sem internet (gateway isolado)."
+        echo "local stratum 10"
+    } > /etc/chrony/conf.d/gwos.conf
+
+    # Debian usa 'confdir /etc/chrony/conf.d'; garante que está ativo
+    if [ -f /etc/chrony/chrony.conf ] \
+       && ! grep -qE '^\s*(confdir|include)\s+/etc/chrony/conf\.d' /etc/chrony/chrony.conf; then
+        echo "confdir /etc/chrony/conf.d" >> /etc/chrony/chrony.conf
+    fi
+    svc_ativo chrony && systemctl restart chrony >/dev/null 2>&1 || true
+    _msg ok "chrony → clientes autorizados: $(redes_internas | tr '\n' ' ')"
+fi
+
+# ---------------------------------------------------------------------------
+# 5. Painel + banco — repopula listas geradas a partir do banco
+# ---------------------------------------------------------------------------
+if tem_painel && tem_banco && REPO="$(raiz_projeto)"; then
+    if tem_squid && [ -f "${REPO}/scripts/gerar_squid_dominios.sh" ]; then
+        bash "${REPO}/scripts/gerar_squid_dominios.sh" --no-reconfigure >/dev/null 2>&1 || true
+        bash "${REPO}/scripts/gerar_squid_acl.sh"      --no-reconfigure >/dev/null 2>&1 || true
+        svc_ativo squid && { squid -k reconfigure >/dev/null 2>&1 || true; }
+        _msg ok "Squid → listas de domínios e horários recarregadas do banco."
+    fi
+    if tem_bind9 && [ -f "${REPO}/scripts/aplicar_bind9_rpz.sh" ]; then
+        bash "${REPO}/scripts/aplicar_bind9_rpz.sh" >/dev/null 2>&1 || true
+        _msg ok "BIND9 → zona RPZ regerada a partir do banco."
+    fi
+    # As regras com grupos de IPs e NAT 1:1 já entraram no passo 3:
+    # gwos-gerar-nftables delega para scripts/aplicar_nftables.sh quando
+    # o banco e o painel existem.
+fi
+
+# ---------------------------------------------------------------------------
+# Resumo
+# ---------------------------------------------------------------------------
+if [ "$SILENCIOSO" != "1" ]; then
+    echo ""
+    echo -e "  ${BOLD}Módulos GWOS presentes nesta máquina:${NC}"
+    if [ -z "$(modulos_instalados)" ]; then
+        echo "    (nenhum registrado em ${GWOS_MODULOS})"
+    else
+        while read -r m; do
+            [ -n "$m" ] && echo "    • ${m}"
+        done < <(modulos_instalados)
+    fi
+    echo ""
+fi
