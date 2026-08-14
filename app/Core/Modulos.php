@@ -25,6 +25,7 @@ class Modulos
             'icone'    => 'bi-hdd-network',
             'secao'    => 'Rede',
             'rota'     => '/modulos/rede',
+            'tela'     => false,   // vira true quando a tela do modulo existir
             'servicos' => [],
             'resumo'   => 'Interfaces, IP do gateway e domínio interno',
         ],
@@ -33,7 +34,8 @@ class Modulos
             'titulo'   => 'Banco de dados',
             'icone'    => 'bi-database',
             'secao'    => 'Sistema',
-            'rota'     => null,          // sem tela própria
+            'rota'     => null,    // sem tela própria
+            'tela'     => false,
             'servicos' => ['mariadb'],
             'resumo'   => 'Grupos, domínios, horários e relatórios',
         ],
@@ -43,6 +45,7 @@ class Modulos
             'icone'    => 'bi-signpost-split',
             'secao'    => 'Rede',
             'rota'     => '/modulos/dns',
+            'tela'     => false,   // vira true quando a tela do modulo existir
             'servicos' => ['named'],
             'resumo'   => 'Resolvers, zonas e bloqueio por domínio',
         ],
@@ -52,6 +55,7 @@ class Modulos
             'icone'    => 'bi-tag',
             'secao'    => 'Rede',
             'rota'     => '/modulos/nomes',
+            'tela'     => false,   // vira true quando a tela do modulo existir
             'servicos' => ['gwos-dnsmasq'],
             'resumo'   => 'Vincular um nome a um IP da LAN',
         ],
@@ -61,6 +65,7 @@ class Modulos
             'icone'    => 'bi-clock-history',
             'secao'    => 'Rede',
             'rota'     => '/modulos/hora',
+            'tela'     => false,   // vira true quando a tela do modulo existir
             'servicos' => ['chrony'],
             'resumo'   => 'Servidores NTP e quem sincroniza',
         ],
@@ -70,6 +75,7 @@ class Modulos
             'icone'    => 'bi-shield-lock',
             'secao'    => 'Rede',
             'rota'     => '/modulos/firewall',
+            'tela'     => false,   // vira true quando a tela do modulo existir
             'servicos' => ['nftables'],
             'resumo'   => 'Regras, NAT e redirecionamentos',
         ],
@@ -79,6 +85,7 @@ class Modulos
             'icone'    => 'bi-globe',
             'secao'    => 'Rede',
             'rota'     => '/modulos/proxy',
+            'tela'     => false,   // vira true quando a tela do modulo existir
             'servicos' => ['squid'],
             'resumo'   => 'Portas, listas e certificado da CA',
         ],
@@ -88,6 +95,7 @@ class Modulos
             'icone'    => 'bi-window',
             'secao'    => 'Sistema',
             'rota'     => null,
+            'tela'     => false,   // vira true quando a tela do modulo existir
             'servicos' => ['nginx', 'php8.4-fpm'],
             'resumo'   => 'Este painel',
         ],
@@ -131,13 +139,14 @@ class Modulos
 
     /**
      * Seções do menu: ['Rede' => [modulo, ...], 'Sistema' => [...]].
-     * Só entram módulos instalados que tenham tela.
+     * Só entram módulos instalados cuja tela já existe — enquanto 'tela' for
+     * false o módulo aparece apenas na visão geral, sem link quebrado no menu.
      */
     public static function menu(): array
     {
         $secoes = [];
         foreach (self::instalados() as $modulo) {
-            if ($modulo['rota'] === null) {
+            if ($modulo['rota'] === null || $modulo['tela'] !== true) {
                 continue;
             }
             $secoes[$modulo['secao']][] = $modulo;
@@ -164,6 +173,24 @@ class Modulos
             $estado[$servico] = ($codigo === 0);
         }
         return $estado;
+    }
+
+    /**
+     * Módulos do catálogo que ainda não foram instalados, com o comando de
+     * instalação. É o que mostra ao administrador o que dá para acrescentar.
+     */
+    public static function naoInstalados(): array
+    {
+        $lista = [];
+        foreach (self::CATALOGO as $marcador => $meta) {
+            if (isset(self::instalados()[$marcador])) {
+                continue;
+            }
+            $meta['marcador'] = $marcador;
+            $meta['comando']  = 'bash modulos/' . $meta['pasta'] . '/instalar.sh';
+            $lista[$marcador] = $meta;
+        }
+        return $lista;
     }
 
     /** O banco é opcional: sem ele o painel roda em modo leve. */

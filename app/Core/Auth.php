@@ -15,10 +15,7 @@ class Auth
 
     public static function login(string $email, string $senha): bool
     {
-        $admin = Database::fetch(
-            'SELECT * FROM admins WHERE email = ? AND ativo = 1',
-            [trim($email)]
-        );
+        $admin = Usuarios::buscarPorEmail($email);
 
         if (!$admin) {
             return false;
@@ -36,18 +33,15 @@ class Auth
                 $bloqueado  = (new \DateTime('+' . self::BLOQUEIO_MIN . ' minutes'))->format('Y-m-d H:i:s');
                 $tentativas = 0;
             }
-            Database::execute(
-                'UPDATE admins SET tentativas = ?, bloqueado_ate = ? WHERE id = ?',
-                [$tentativas, $bloqueado, $admin['id']]
-            );
+            Usuarios::atualizar((int) $admin['id'], [
+                'tentativas'    => $tentativas,
+                'bloqueado_ate' => $bloqueado,
+            ]);
             return false;
         }
 
         // Sucesso — zera contadores e atualiza ultimo login
-        Database::execute(
-            'UPDATE admins SET tentativas = 0, bloqueado_ate = NULL, ultimo_login = NOW() WHERE id = ?',
-            [$admin['id']]
-        );
+        Usuarios::registrarLogin((int) $admin['id']);
 
         Session::definir(self::CHAVE_SESSAO, [
             'id'             => $admin['id'],
@@ -104,10 +98,7 @@ class Auth
 
     public static function trocarSenha(int $id, string $senhaAtual, string $novaSenha): bool
     {
-        $admin = Database::fetch(
-            'SELECT senha, primeiro_login FROM admins WHERE id = ?',
-            [$id]
-        );
+        $admin = Usuarios::buscarPorId($id);
         if (!$admin) return false;
 
         // No primeiro login não exige a senha atual (ela é a padrão e será descartada)
@@ -116,11 +107,10 @@ class Auth
             return false;
         }
 
-        $hash = password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]);
-        Database::execute(
-            'UPDATE admins SET senha = ?, primeiro_login = 0 WHERE id = ?',
-            [$hash, $id]
-        );
+        Usuarios::atualizar($id, [
+            'senha'          => password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]),
+            'primeiro_login' => 0,
+        ]);
 
         $dados = Session::obter(self::CHAVE_SESSAO);
         if ($dados) {
@@ -133,50 +123,42 @@ class Auth
 
     public static function gerarTokenReset(string $email): string|null
     {
-        $admin = Database::fetch(
-            'SELECT id FROM admins WHERE email = ? AND ativo = 1',
-            [trim($email)]
-        );
+        $admin = Usuarios::buscarPorEmail($email);
         if (!$admin) return null;
 
         $token  = strtoupper(bin2hex(random_bytes(16)));
         $expira = (new \DateTime('+24 hours'))->format('Y-m-d H:i:s');
 
-        Database::execute(
-            'UPDATE admins SET reset_token = ?, reset_expira = ? WHERE id = ?',
-            [$token, $expira, $admin['id']]
-        );
+        Usuarios::atualizar((int) $admin['id'], [
+            'reset_token'  => $token,
+            'reset_expira' => $expira,
+        ]);
 
         return $token;
     }
 
     public static function resetarSenhaPorToken(string $email, string $token, string $novaSenha): bool
     {
-        $admin = Database::fetch(
-            'SELECT id, reset_token, reset_expira FROM admins WHERE email = ? AND ativo = 1',
-            [trim($email)]
-        );
+        $admin = Usuarios::buscarPorEmail($email);
 
-        if (!$admin || !$admin['reset_token']) return false;
-        if (strtoupper(trim($token)) !== $admin['reset_token']) return false;
+        if (!$admin || empty($admin['reset_token'])) return false;
+        if (!hash_equals($admin['reset_token'], strtoupper(trim($token)))) return false;
         if (new \DateTime() > new \DateTime($admin['reset_expira'])) return false;
 
-        $hash = password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]);
-        Database::execute(
-            'UPDATE admins SET senha = ?, reset_token = NULL, reset_expira = NULL, primeiro_login = 0 WHERE id = ?',
-            [$hash, $admin['id']]
-        );
+        Usuarios::atualizar((int) $admin['id'], [
+            'senha'          => password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]),
+            'reset_token'    => null,
+            'reset_expira'   => null,
+            'primeiro_login' => 0,
+        ]);
 
         return true;
     }
 
     public static function mensagemBloqueio(string $email): string|null
     {
-        $admin = Database::fetch(
-            'SELECT bloqueado_ate FROM admins WHERE email = ?',
-            [trim($email)]
-        );
-        if (!$admin || !$admin['bloqueado_ate']) return null;
+        $admin = Usuarios::buscarPorEmail($email);
+        if (!$admin || empty($admin['bloqueado_ate'])) return null;
         if (new \DateTime() < new \DateTime($admin['bloqueado_ate'])) {
             $ate = (new \DateTime($admin['bloqueado_ate']))->format('H:i');
             return "Conta bloqueada por excesso de tentativas. Tente novamente apos as {$ate}.";

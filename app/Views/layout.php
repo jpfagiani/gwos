@@ -152,37 +152,65 @@ $hostPainel = parse_url(config('app.url', ''), PHP_URL_HOST) ?: '';
             <?php if ($hostPainel): ?><div class="logo-sub"><?= h($hostPainel) ?></div><?php endif; ?>
         </div>
     </div>
+<?php
+    // Menu dirigido pelos módulos instalados. As seções que dependem do banco
+    // só aparecem se o módulo 10-banco-mariadb existir — sem ele o painel roda
+    // em modo leve, com as telas que vivem em arquivo.
+    $menuTemBanco  = \App\Core\Modulos::temBanco();
+    $menuModulos   = \App\Core\Modulos::menu();
+    $menuAtual     = $modulo ?? '';
+?>
     <nav class="nav flex-column pt-1">
         <span class="nav-section">Principal</span>
-        <a class="nav-link <?= ($modulo ?? '') === 'dashboard' ? 'active' : '' ?>" href="/">
+        <?php if ($menuTemBanco): ?>
+        <a class="nav-link <?= $menuAtual === 'dashboard' ? 'active' : '' ?>" href="/">
             <i class="bi bi-speedometer2"></i> Dashboard
         </a>
+        <?php endif; ?>
+        <a class="nav-link <?= $menuAtual === 'modulos' ? 'active' : '' ?>" href="/modulos">
+            <i class="bi bi-grid-3x3-gap-fill"></i> Módulos
+        </a>
 
+        <?php if ($menuTemBanco): ?>
         <span class="nav-section">Controle de acesso</span>
-        <a class="nav-link <?= ($modulo ?? '') === 'grupos' ? 'active' : '' ?>" href="/grupos">
+        <a class="nav-link <?= $menuAtual === 'grupos' ? 'active' : '' ?>" href="/grupos">
             <i class="bi bi-people-fill"></i> Grupos e IPs
         </a>
-        <a class="nav-link <?= ($modulo ?? '') === 'dominios' ? 'active' : '' ?>" href="/dominios">
+        <a class="nav-link <?= $menuAtual === 'dominios' ? 'active' : '' ?>" href="/dominios">
             <i class="bi bi-globe2"></i> Domínios
         </a>
-        <a class="nav-link <?= ($modulo ?? '') === 'horarios' ? 'active' : '' ?>" href="/horarios">
+        <a class="nav-link <?= $menuAtual === 'horarios' ? 'active' : '' ?>" href="/horarios">
             <i class="bi bi-clock-fill"></i> Horários
         </a>
+        <?php endif; ?>
 
+        <?php foreach ($menuModulos as $secao => $itens): ?>
+        <span class="nav-section"><?= h($secao) ?></span>
+            <?php foreach ($itens as $item): ?>
+        <a class="nav-link <?= $menuAtual === $item['marcador'] ? 'active' : '' ?>" href="<?= h($item['rota']) ?>">
+            <i class="bi <?= h($item['icone']) ?>"></i> <?= h($item['titulo']) ?>
+        </a>
+            <?php endforeach; ?>
+        <?php endforeach; ?>
+
+        <?php if ($menuTemBanco): ?>
         <span class="nav-section">Rede</span>
-        <a class="nav-link <?= ($modulo ?? '') === 'nat' ? 'active' : '' ?>" href="/nat">
+        <a class="nav-link <?= $menuAtual === 'nat' ? 'active' : '' ?>" href="/nat">
             <i class="bi bi-arrow-left-right"></i> NAT 1:1
         </a>
 
         <span class="nav-section">Relatórios</span>
-        <a class="nav-link <?= ($modulo ?? '') === 'relatorios' ? 'active' : '' ?>" href="/relatorios">
+        <a class="nav-link <?= $menuAtual === 'relatorios' ? 'active' : '' ?>" href="/relatorios">
             <i class="bi bi-bar-chart-fill"></i> Relatórios
         </a>
+        <?php endif; ?>
 
         <span class="nav-section">Sistema</span>
-        <a class="nav-link <?= ($modulo ?? '') === 'configuracoes' ? 'active' : '' ?>" href="/configuracoes">
+        <?php if ($menuTemBanco): ?>
+        <a class="nav-link <?= $menuAtual === 'configuracoes' ? 'active' : '' ?>" href="/configuracoes">
             <i class="bi bi-gear-fill"></i> Configurações
         </a>
+        <?php endif; ?>
         <a class="nav-link <?= ($modulo ?? '') === 'senha' ? 'active' : '' ?>" href="/senha/trocar">
             <i class="bi bi-key-fill"></i> Alterar senha
         </a>

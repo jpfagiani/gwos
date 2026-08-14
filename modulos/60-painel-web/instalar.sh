@@ -29,10 +29,20 @@ iniciar_modulo "60-painel-web"
 REPO="$(raiz_projeto)" || erro "Repositório GWOS não encontrado — este módulo precisa de app/, public/ e scripts/."
 info "Projeto: ${REPO}"
 
-tem_banco || erro "Instale antes o módulo 10-banco-mariadb (o painel não funciona sem banco)."
-[ -f "$GWOS_DB_CONF" ] || erro "Credenciais do banco ausentes (${GWOS_DB_CONF}) — reexecute o módulo 10."
-# shellcheck disable=SC1090
-. "$GWOS_DB_CONF"
+# O banco é opcional. Com ele, o painel mostra grupos, IPs, domínios, horários
+# e relatórios. Sem ele, sobe em MODO LEVE: só as telas cujos dados vivem em
+# arquivo (módulos, rede, DNS, hora, nomes). É o que permite ter painel num
+# servidor que só roda DNS, sem subir um MariaDB para guardar uma senha.
+MODO_LEVE=1
+if tem_banco && [ -f "$GWOS_DB_CONF" ]; then
+    MODO_LEVE=0
+    # shellcheck disable=SC1090
+    . "$GWOS_DB_CONF"
+    ok "Módulo 10-banco-mariadb encontrado — painel completo."
+else
+    aviso "Sem o módulo 10-banco-mariadb — painel em modo leve."
+    aviso "Grupos, domínios, horários e relatórios ficam indisponíveis."
+fi
 
 # ---------------------------------------------------------------------------
 # Repositório do PHP 8.4 (não existe nos repos padrão do Debian 13)
@@ -98,7 +108,8 @@ ok "Nginx configurado."
 # ---------------------------------------------------------------------------
 # .env
 # ---------------------------------------------------------------------------
-cat > "${REPO}/.env" <<ENV
+if [ "$MODO_LEVE" = "0" ]; then
+    cat > "${REPO}/.env" <<ENV
 APP_URL=http://${IP_GATEWAY}
 APP_DEBUG=false
 DB_HOST=${DB_HOST}
@@ -106,9 +117,52 @@ DB_BANCO=${DB_BANCO}
 DB_USUARIO=${DB_USUARIO}
 DB_SENHA=${DB_SENHA}
 ENV
+else
+    cat > "${REPO}/.env" <<ENV
+APP_URL=http://${IP_GATEWAY}
+APP_DEBUG=false
+# Modo leve — sem banco de dados. Os usuários do painel ficam em
+# /etc/gwos/painel-usuarios.json. Instale o módulo 10-banco-mariadb e
+# reexecute este módulo para ligar o painel completo.
+ENV
+fi
 chmod 600 "${REPO}/.env"
 chown www-data:www-data "${REPO}/.env"
 ok ".env do painel criado."
+
+# ---------------------------------------------------------------------------
+# Usuários do painel em arquivo (só no modo leve)
+# ---------------------------------------------------------------------------
+if [ "$MODO_LEVE" = "1" ]; then
+    ARQ_USUARIOS="/etc/gwos/painel-usuarios.json"
+    if [ -f "$ARQ_USUARIOS" ]; then
+        aviso "Usuários do painel preservados (${ARQ_USUARIOS})."
+    else
+        HASH=$(php -r 'echo password_hash("gwos@2025", PASSWORD_BCRYPT, ["cost" => 12]);')
+        cat > "$ARQ_USUARIOS" <<USUARIOS
+[
+    {
+        "id": 1,
+        "nome": "Administrador",
+        "email": "admin@gwos.local",
+        "senha": "${HASH}",
+        "perfil": "superadmin",
+        "ativo": 1,
+        "primeiro_login": 1,
+        "tentativas": 0,
+        "bloqueado_ate": null,
+        "ultimo_login": null,
+        "reset_token": null,
+        "reset_expira": null
+    }
+]
+USUARIOS
+        ok "Usuário do painel criado em ${ARQ_USUARIOS}."
+    fi
+    # O painel precisa escrever aqui (tentativas, bloqueio, troca de senha)
+    chown root:www-data "$ARQ_USUARIOS"
+    chmod 660 "$ARQ_USUARIOS"
+fi
 
 # ---------------------------------------------------------------------------
 # Sudo — o painel roda como www-data e precisa aplicar as regras
@@ -167,7 +221,7 @@ ok "Diretórios e permissões ajustados."
 # ---------------------------------------------------------------------------
 # Senha padrão do painel (só se ainda for o hash de exemplo do schema)
 # ---------------------------------------------------------------------------
-if [ -x /usr/local/sbin/gwos-senha-padrao ]; then
+if [ "$MODO_LEVE" = "0" ] && [ -x /usr/local/sbin/gwos-senha-padrao ]; then
     /usr/local/sbin/gwos-senha-padrao || aviso "Não foi possível definir a senha padrão."
 fi
 
@@ -186,4 +240,13 @@ ok "Módulo 60-painel-web instalado."
 echo -e "  URL          : ${BOLD}http://${IP_GATEWAY}${NC}"
 echo -e "  Login        : ${BOLD}admin@gwos.local${NC}"
 echo -e "  Senha padrão : ${BOLD}gwos@2025${NC}  ${YELLOW}(troque no primeiro acesso)${NC}"
+if [ "$MODO_LEVE" = "1" ]; then
+    echo ""
+    aviso "Modo leve: o painel mostra os módulos e o que vive em arquivo."
+    echo  "      Para o painel completo: bash ../10-banco-mariadb/instalar.sh"
+    echo  "      e depois reexecute este módulo."
+fi
+echo ""
+echo -e "  Módulos instalados nesta máquina: ${BOLD}$(modulos_instalados | paste -sd ', ' -)${NC}"
+echo -e "  A tela ${BOLD}Módulos${NC} do painel se atualiza sozinha quando você instalar outro."
 echo ""

@@ -141,6 +141,12 @@ class DashboardController extends Controller
     {
         Auth::exigir();
 
+        // Modo leve: sem o módulo 10-banco-mariadb não há grupos, IPs nem
+        // relatórios para mostrar. A visão geral dos módulos vira a home.
+        if (!\App\Core\Modulos::temBanco()) {
+            $this->redirect('/modulos');
+        }
+
         $servicos = $this->statusServicos();
 
         $totalIps      = (int) Database::valor('SELECT COUNT(*) FROM ips WHERE ativo = 1');

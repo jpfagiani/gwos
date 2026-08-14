@@ -19,6 +19,7 @@ date_default_timezone_set(config('app.timezone') ?: 'America/Sao_Paulo');
 $router = new \App\Core\Router();
 
 require BASE_PATH . '/routes/web.php';
+require BASE_PATH . '/routes/modulos.php';
 require BASE_PATH . '/routes/api.php';
 
 $router->resolver();

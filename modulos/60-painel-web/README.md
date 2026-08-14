@@ -5,8 +5,30 @@ sudo e as tarefas de cron.
 
 ## Depende de
 
-- **10-banco-mariadb** (obrigatório — o instalador aborta sem ele)
 - repositório GWOS completo (`app/`, `public/`, `routes/`, `scripts/`)
+- **10-banco-mariadb** — opcional; sem ele o painel sobe em modo leve
+
+## Modo completo e modo leve
+
+O painel se adapta ao que existe na máquina, igual aos instaladores.
+
+| | Modo leve (sem banco) | Modo completo |
+|---|---|---|
+| Módulos, estado, status dos serviços | sim | sim |
+| Rede, DNS, hora, nomes internos | sim | sim |
+| Grupos, IPs, domínios, horários, NAT | não | sim |
+| Dashboard e relatórios | não | sim |
+| Usuários | `/etc/gwos/painel-usuarios.json` | tabela `admins` |
+
+No modo leve a home passa a ser a tela **Módulos**. Para migrar depois, instale
+o `10-banco-mariadb` e reexecute este módulo — o painel completo liga sozinho.
+
+## A tela Módulos
+
+Lê `/etc/gwos/modulos.d/` a cada carregamento: instalou o chrony pelo terminal,
+a seção aparece na próxima página. Não há cadastro nem script de atualização.
+Mostra o estado dos serviços de cada módulo, o `gwos.conf` em vigor e o comando
+de instalação dos que ainda faltam.
 
 ## O que faz
 
