@@ -34,7 +34,7 @@ else
     falha "Nada escutando em 127.0.0.1:${DNSMASQ_PORTA}."; FALHAS=$((FALHAS+1))
 fi
 
-HOSTS=$(grep -cE "\.${DOMINIO_LOCAL}(\s|$)" /etc/hosts 2>/dev/null || echo 0)
+HOSTS=$(grep -cE "\.${DOMINIO_LOCAL}(\s|$)" /etc/hosts 2>/dev/null) || HOSTS=0
 info "Nomes cadastrados em /etc/hosts para ${DOMINIO_LOCAL}: ${HOSTS}"
 
 if command -v dig >/dev/null 2>&1 && [ "${HOSTS:-0}" -gt 0 ]; then

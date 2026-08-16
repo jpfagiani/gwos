@@ -52,7 +52,7 @@ else
 fi
 
 # Coerência com os outros módulos
-REDIR=$(nft list ruleset 2>/dev/null | grep -c "redirect to :${SQUID_PORTA:-3128}" || echo 0)
+REDIR=$(nft list ruleset 2>/dev/null | grep -c "redirect to :${SQUID_PORTA:-3128}") || REDIR=0
 if tem_squid; then
     [ "$REDIR" -gt 0 ] && ok "Redirecionamento para o Squid presente." \
         || { falha "Squid instalado mas sem redirecionamento — rode gwos-integrar."; FALHAS=$((FALHAS+1)); }

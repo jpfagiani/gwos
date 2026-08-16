@@ -62,7 +62,7 @@ if tem_bind9 && [ "${DNS:-}" != "127.0.0.1" ]; then
 fi
 
 if [ -r /var/log/squid/access.log ]; then
-    LINHAS=$(wc -l < /var/log/squid/access.log 2>/dev/null || echo 0)
+    LINHAS=$(wc -l < /var/log/squid/access.log 2>/dev/null) || LINHAS=0
     info "Registros no access.log: ${LINHAS}"
 fi
 

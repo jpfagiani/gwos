@@ -19,7 +19,8 @@ else falha "Serviço chrony parado."; FALHAS=$((FALHAS+1)); fi
 
 if [ -f /etc/chrony/conf.d/gwos.conf ]; then
     ok "Configuração do GWOS presente."
-    echo "     Fonte preferida: $(grep '^server' /etc/chrony/conf.d/gwos.conf | awk '{print $2}' | paste -sd ' ' -)"
+    FONTE=$(grep '^server' /etc/chrony/conf.d/gwos.conf 2>/dev/null | awk '{print $2}' | paste -sd ' ' -)
+    echo "     Fonte preferida: ${FONTE:-(nenhuma — só o pool público)}"
     echo "     Reserva        : $(grep '^pool'   /etc/chrony/conf.d/gwos.conf | awk '{print $2}' | paste -sd ' ' -)"
     echo "     Redes liberadas: $(grep '^allow'  /etc/chrony/conf.d/gwos.conf | awk '{print $2}' | paste -sd ' ' -)"
 else
@@ -42,7 +43,7 @@ if command -v chronyc >/dev/null 2>&1; then
     else
         falha "chronyc tracking não respondeu."; FALHAS=$((FALHAS+1))
     fi
-    N=$(chronyc sources 2>/dev/null | grep -c '^\^' || echo 0)
+    N=$(chronyc sources 2>/dev/null | grep -c '^\^') || N=0
     info "Fontes de tempo configuradas: ${N}"
 fi
 

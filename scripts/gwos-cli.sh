@@ -83,7 +83,7 @@ cmd_status() {
 
     echo ""
     titulo "  Squid"
-    SQUID_CONN=$(ss -tnp | grep -c 'squid' 2>/dev/null || echo 0)
+    SQUID_CONN=$(ss -tnp 2>/dev/null | grep -c 'squid') || SQUID_CONN=0
     echo "  Conexões ativas: $SQUID_CONN"
 
     echo ""

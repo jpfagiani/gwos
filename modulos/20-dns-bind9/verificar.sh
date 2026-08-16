@@ -64,7 +64,9 @@ else
     aviso "dig não instalado (pacote dnsutils) — testes de resolução pulados."
 fi
 
-BLOQ=$(grep -c 'IN CNAME \.' /etc/bind/db.rpz.gwos 2>/dev/null || echo 0)
+# 'grep -c || echo 0' devolve DOIS zeros: o grep imprime 0 e sai com 1,
+# e o echo acrescenta o segundo. O $(( )) seguinte quebrava com isso.
+BLOQ=$(grep -c 'IN CNAME \.' /etc/bind/db.rpz.gwos 2>/dev/null) || BLOQ=0
 info "Domínios na zona RPZ: $(( BLOQ / 2 ))"
 
 echo ""
