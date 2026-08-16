@@ -191,6 +191,19 @@ if tem_firewall; then
 fi
 
 # ---------------------------------------------------------------------------
+# 3b. Painel — o site do nginx acompanha PAINEL_PORTA
+# ---------------------------------------------------------------------------
+# Sem isto, mudar PAINEL_PORTA no gwos.conf não movia nada: o vhost só era
+# escrito pelo instalador, e o valor no arquivo passava a mentir.
+if tem_painel && [ -x /usr/local/sbin/gwos-gerar-nginx ]; then
+    if /usr/local/sbin/gwos-gerar-nginx >/dev/null; then
+        _msg ok "Painel → nginx na porta ${PAINEL_PORTA}"
+    else
+        falha "Não foi possível regerar o site do painel (porta ${PAINEL_PORTA} ocupada?)."
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # 4. chrony — libera as redes internas
 # ---------------------------------------------------------------------------
 if tem_chrony && [ -d /etc/chrony ]; then

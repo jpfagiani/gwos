@@ -47,6 +47,7 @@ fi
 rm -f /etc/sudoers.d/gwos
 rm -f /etc/cron.d/gwos
 rm -f /usr/local/bin/gwos
+rm -f /usr/local/sbin/gwos-gerar-nginx
 ok "sudoers, cron e comando 'gwos' removidos."
 
 if [ -n "$REPO" ]; then

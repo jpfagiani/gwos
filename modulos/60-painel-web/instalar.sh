@@ -91,119 +91,64 @@ ok "PHP-FPM ${PHP_VER} configurado (${PHP_SOCK})."
 salvar_conf PHP_VERSAO "$PHP_VER"
 
 # ---------------------------------------------------------------------------
-# Nginx — escolhe uma porta livre
+# Nginx — o painel precisa de uma porta só dele
 # ---------------------------------------------------------------------------
-# A 80 costuma já estar tomada: Apache, um portal, outro site na mesma
-# máquina. Antes o instalador escrevia o vhost na 80 assim mesmo, o nginx -t
-# passava (a configuração é válida) e o serviço só falhava ao subir, com
-# "control process exited with error code" — sem dizer o motivo.
-#
-# Nome do site: convenção <servidor>-portal, para o portal web ficar amarrado
-# ao servidor que o hospeda — smb-portal, cdpni-portal, gwos-portal.
-SITE_NGINX="gwos-portal"
-
+# Numa unidade é comum a mesma máquina hospedar mais de um portal (o de
+# sistemas, o do Samba). Dois deles na porta 80 não convivem: quem subir
+# primeiro fica, o outro entra em laço de reinício. Por isso a porta é
+# PERGUNTADA, com um padrão que já leva em conta o que existe na máquina.
 SITES_EXISTENTES="$(nginx_outros_sites)"
-DONO_80="$(porta_em_uso "$PAINEL_PORTA")"
-PADRAO=" default_server"
+DONO_80="$(porta_em_uso 80)"
 
-if [ "${SITES_EXISTENTES:-0}" -gt 0 ]; then
-    # ─────────────────────────────────────────────────────────────────────
-    # O nginx desta máquina JÁ SERVE outra coisa (um portal, um sistema
-    # interno). Duas regras, as duas obrigatórias:
-    #
-    # 1. Porta dedicada. Dividir a 80 não funciona: sem default_server o
-    #    painel nunca seria escolhido; com default_server ele roubaria toda
-    #    requisição cujo Host não casa com um server_name explícito — que é
-    #    exatamente o caso de quem acessa o portal por NetBIOS.
-    #
-    # 2. Nunca virar default_server. Vale mesmo em porta dedicada, para não
-    #    mudar o comportamento de nada que já existe.
-    # ─────────────────────────────────────────────────────────────────────
-    aviso "O nginx já serve ${SITES_EXISTENTES} site(s) nesta máquina."
-    NOVA="$(primeira_porta_livre 8080 8081 8090 9080 || true)"
-    [ -n "$NOVA" ] || erro "Nenhuma porta livre para o painel — libere uma e reexecute."
-    PAINEL_PORTA="$NOVA"
-    PADRAO=""
-    ok "Painel em porta dedicada: ${PAINEL_PORTA}. Os sites existentes não são tocados."
-
-elif [ -n "$DONO_80" ] && ! echo "$DONO_80" | grep -q 'nginx'; then
-    # Outro servidor web (Apache, por exemplo) ocupa a 80.
-    aviso "A porta ${PAINEL_PORTA} já está em uso por: ${DONO_80}"
-    NOVA="$(primeira_porta_livre 8080 8081 8090 9080 || true)"
-    [ -n "$NOVA" ] || erro "Nenhuma porta alternativa livre — libere a ${PAINEL_PORTA} e reexecute."
-    PAINEL_PORTA="$NOVA"
-    ok "O painel vai responder na porta ${PAINEL_PORTA}."
-    echo "      O serviço que ocupa a 80 continua intacto."
+if [ "${SITES_EXISTENTES:-0}" -gt 0 ] || { [ -n "$DONO_80" ] && ! echo "$DONO_80" | grep -q nginx; }; then
+    PORTA_SUGERIDA="$(primeira_porta_livre 8080 8081 8090 9080 || echo 8080)"
+    [ "${SITES_EXISTENTES:-0}" -gt 0 ]         && aviso "Esta máquina já serve ${SITES_EXISTENTES} outro(s) site(s) no nginx."         || aviso "A porta 80 já está em uso por: ${DONO_80}"
+    echo "      O painel do GWOS precisa de uma porta própria."
+else
+    PORTA_SUGERIDA=80
 fi
 
-# 'default_server' só pode existir uma vez por porta — repetir faria o nginx
-# recusar a configuração inteira.
-if [ -n "$PADRAO" ] && \
-   grep -rlq "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null; then
-    OUTRO=$(grep -rl "listen.*${PAINEL_PORTA}.*default_server" /etc/nginx/sites-enabled/ 2>/dev/null \
-            | grep -vE "/(gwos|${SITE_NGINX})\$" | head -1)
-    if [ -n "$OUTRO" ]; then
-        PADRAO=""
-        aviso "$(basename "$OUTRO") já é o default_server da porta ${PAINEL_PORTA} — o GWOS entra como vhost comum."
-    fi
-fi
+titulo "── Porta do painel ──"
+echo ""
+echo "  Em quem já usa a 80 para outro portal, escolha 8080 (ou outra)."
+echo "  Depois dá para mudar com: gwos-definir PAINEL_PORTA <porta>"
+echo ""
+perguntar PAINEL_PORTA "Porta do painel GWOS" "$PORTA_SUGERIDA"
 
-cat > /etc/nginx/sites-available/${SITE_NGINX} <<NGINX
-server {
-    listen ${PAINEL_PORTA}${PADRAO};
-    server_name _;
-    root ${REPO}/public;
-    index index.php;
+while ! echo "$PAINEL_PORTA" | grep -qE '^[0-9]{1,5}$' || [ "$PAINEL_PORTA" -lt 1 ] || [ "$PAINEL_PORTA" -gt 65535 ]; do
+    aviso "Porta inválida: '${PAINEL_PORTA}'"
+    perguntar PAINEL_PORTA "Porta do painel GWOS" "$PORTA_SUGERIDA"
+done
 
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
+OCUPANTE="$(porta_em_uso "$PAINEL_PORTA")"
+while [ -n "$OCUPANTE" ] && ! echo "$OCUPANTE" | grep -q nginx; do
+    aviso "A porta ${PAINEL_PORTA} está ocupada por: ${OCUPANTE}"
+    perguntar PAINEL_PORTA "Outra porta para o painel" "$(primeira_porta_livre 8080 8081 8090 9080 || echo 8080)"
+    OCUPANTE="$(porta_em_uso "$PAINEL_PORTA")"
+done
 
-    location ~ \.php\$ {
-        fastcgi_pass unix:${PHP_SOCK};
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
+salvar_conf PAINEL_PORTA "$PAINEL_PORTA"
 
-    location ~ /\. { deny all; }
-    location = /favicon.ico { log_not_found off; }
-}
-NGINX
-
-ln -sf "/etc/nginx/sites-available/${SITE_NGINX}" "/etc/nginx/sites-enabled/${SITE_NGINX}"
-
-# Instalação anterior usava o nome 'gwos'. Deixar os dois habilitados criaria
-# duas vezes o mesmo vhost na mesma porta.
-if [ "$SITE_NGINX" != "gwos" ] && [ -e /etc/nginx/sites-enabled/gwos ]; then
-    rm -f /etc/nginx/sites-enabled/gwos /etc/nginx/sites-available/gwos
-    info "Site antigo 'gwos' substituído por '${SITE_NGINX}'."
-fi
-
-# O 'default' de fábrica só sai quando o painel assume a porta 80 e não há
-# mais nada servido aqui. Numa máquina compartilhada ele fica: pode ter sido
-# adaptado para servir algo.
-if [ -e /etc/nginx/sites-enabled/default ] \
-   && [ "${SITES_EXISTENTES:-0}" -eq 0 ] && [ "$PAINEL_PORTA" = "80" ]; then
+# O site 'default' de fábrica só sai se o painel assumir a 80 sozinho.
+if [ -e /etc/nginx/sites-enabled/default ]    && [ "${SITES_EXISTENTES:-0}" -eq 0 ] && [ "$PAINEL_PORTA" = "80" ]; then
     rm -f /etc/nginx/sites-enabled/default
     info "Site 'default' do Debian removido."
 fi
 
-nginx -t || erro "nginx -t reprovou a configuração."
+# Instalação anterior usava o nome 'gwos' — dois vhosts do mesmo painel na
+# mesma porta faria o nginx recusar a configuração.
+rm -f /etc/nginx/sites-enabled/gwos /etc/nginx/sites-available/gwos
 
-if ! svc_ativar nginx; then
-    falha "O nginx não subiu. Últimas linhas do log:"
+install -m 755 "${MOD_DIR}/gerar-nginx.sh" /usr/local/sbin/gwos-gerar-nginx
+
+if ! /usr/local/sbin/gwos-gerar-nginx; then
+    falha "Não foi possível publicar o site do painel."
     journalctl -xeu nginx --no-pager -n 15 2>/dev/null | sed 's/^/      /' || true
-    echo ""
-    OCUPADA="$(porta_em_uso "$PAINEL_PORTA")"
-    if [ -n "$OCUPADA" ]; then
-        echo "      A porta ${PAINEL_PORTA} está com: ${OCUPADA}"
-        echo "      Escolha outra porta em ${GWOS_CONF} (PAINEL_PORTA) e reexecute."
-    fi
-    erro "Módulo interrompido — o site do GWOS ficou configurado mas não está no ar."
+    erro "Módulo interrompido."
 fi
-systemctl reload nginx 2>/dev/null || true
-salvar_conf PAINEL_PORTA "$PAINEL_PORTA"
-ok "Nginx configurado: site ${SITE_NGINX} na porta ${PAINEL_PORTA}."
+
+svc_ativar nginx
+ok "Nginx configurado na porta ${PAINEL_PORTA}."
 
 # ---------------------------------------------------------------------------
 # .env
