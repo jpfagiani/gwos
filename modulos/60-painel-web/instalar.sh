@@ -251,6 +251,35 @@ instalar_pacotes sudo
 
 [ -f /etc/sudoers ] || erro "/etc/sudoers não existe mesmo após instalar o sudo — instalação abortada."
 
+# Um /etc/sudoers sem regra para o root deixa a máquina sem sudo nenhum —
+# "root is not in the sudoers file". Versões anteriores deste módulo criavam
+# exatamente isso quando o pacote sudo não estava instalado: o >> gerava um
+# arquivo com uma linha só. Se for esse o caso, restaura o padrão do Debian.
+if ! grep -qE '^[[:space:]]*root[[:space:]]+ALL' /etc/sudoers; then
+    aviso "/etc/sudoers não tem regra para o root — o sudo desta máquina está quebrado."
+    backup_arquivo /etc/sudoers
+    SUDOERS_NOVO="$(mktemp /tmp/gwos_sudoers_base.XXXXXX)"
+    cat > "$SUDOERS_NOVO" <<'SUDOERS'
+# Restaurado pelo módulo 60-painel-web do GWOS — padrão do Debian.
+Defaults        env_reset
+Defaults        mail_badpass
+Defaults        secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+root    ALL=(ALL:ALL) ALL
+%sudo   ALL=(ALL:ALL) ALL
+
+@includedir /etc/sudoers.d
+SUDOERS
+    if visudo -c -f "$SUDOERS_NOVO" >/dev/null 2>&1; then
+        install -m 440 -o root -g root "$SUDOERS_NOVO" /etc/sudoers
+        rm -f "$SUDOERS_NOVO"
+        ok "/etc/sudoers restaurado (root e %sudo voltam a ter permissão)."
+    else
+        rm -f "$SUDOERS_NOVO"
+        erro "Não foi possível montar um /etc/sudoers válido — corrija à mão antes de seguir."
+    fi
+fi
+
 # O diretório vem com o pacote, mas pode ter sido removido. Modo 0750 é o que
 # o sudo exige; mais permissivo que isso ele recusa ler.
 mkdir -p /etc/sudoers.d
@@ -336,8 +365,18 @@ ok "Diretórios e permissões ajustados."
 # ---------------------------------------------------------------------------
 # Senha padrão do painel (só se ainda for o hash de exemplo do schema)
 # ---------------------------------------------------------------------------
-if [ "$MODO_LEVE" = "0" ] && [ -x /usr/local/sbin/gwos-senha-padrao ]; then
-    /usr/local/sbin/gwos-senha-padrao || aviso "Não foi possível definir a senha padrão."
+if [ "$MODO_LEVE" = "0" ]; then
+    if [ -x /usr/local/sbin/gwos-senha-padrao ]; then
+        if /usr/local/sbin/gwos-senha-padrao; then
+            :
+        else
+            aviso "A senha padrão NÃO foi definida — o login vai recusar 'gwos@2025'."
+            echo  "      O schema traz um hash de exemplo que não corresponde a senha alguma."
+            echo  "      Depois de resolver, rode: /usr/local/sbin/gwos-senha-padrao"
+        fi
+    else
+        aviso "gwos-senha-padrao ausente — reexecute o módulo 10-banco-mariadb."
+    fi
 fi
 
 # Publica a CA do Squid, se existir
