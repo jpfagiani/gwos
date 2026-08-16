@@ -94,6 +94,24 @@ valida_cidr() { echo "$1" | grep -qE "^(${_OCT}\.){3}${_OCT}/(3[0-2]|[12]?[0-9])
 # mesma rede do IP desta máquina. Sem esta checagem dava para responder
 # 127.0.0.1 e o instalador gravava "via 127.0.0.1" sem reclamar — a máquina
 # aceita a rota e simplesmente não sai da rede.
+# Mascara de rede tem que ser contigua: 255.255.255.0 vale, 255.0.255.0 nao.
+# prefixo_de_mascara() so conta bits, entao aceitaria a segunda em silencio e
+# geraria uma rede sem sentido.
+valida_mascara() {
+    local m="$1"
+    valida_ip "$m" || return 1
+    [ "$(mascara_de_prefixo "$(prefixo_de_mascara "$m")")" = "$m" ]
+}
+
+# O IP precisa pertencer a rede declarada. Sem isto da para dizer que a LAN e
+# 192.168.0.0/24 e que o gateway e 10.0.0.1 — o instalador aceitava, e so o
+# ifup no reboot reclamava.
+ip_na_rede() {
+    local ip="$1" cidr="$2" pref
+    pref="${cidr#*/}"
+    [ "$(rede_de_ip "$ip" "$pref")" = "$cidr" ]
+}
+
 gateway_valido() {
     local gw="$1" ip="$2" pref="$3" rede
     if ! valida_ip "$gw"; then

@@ -216,8 +216,12 @@ if [ "$PAPEL" = "gateway" ]; then
     done
 
     perguntar IP_GATEWAY "IP deste gateway na rede interna" "$IP_SUGERIDO"
-    while ! valida_ip "$IP_GATEWAY"; do
-        aviso "IP inválido: '${IP_GATEWAY}'"
+    while ! valida_ip "$IP_GATEWAY" || ! ip_na_rede "$IP_GATEWAY" "$REDE_LAN"; do
+        if ! valida_ip "$IP_GATEWAY"; then
+            aviso "IP inválido: '${IP_GATEWAY}'"
+        else
+            aviso "${IP_GATEWAY} não pertence à rede ${REDE_LAN} que você declarou."
+        fi
         perguntar IP_GATEWAY "IP deste gateway na rede interna" "$IP_SUGERIDO"
     done
     ok "Rede: $REDE_LAN  |  IP: $IP_GATEWAY"
@@ -257,11 +261,31 @@ if [ "$PAPEL" = "gateway" ]; then
     else
         WAN_MODO="static"
         WAN_PREF=$(echo "$WAN_IP_ATUAL" | cut -d/ -f2)
-        perguntar WAN_IP   "IP estático WAN" "$(echo "$WAN_IP_ATUAL" | cut -d/ -f1)"
-        perguntar WAN_MASK "Máscara de rede" "$(mascara_de_prefixo "${WAN_PREF:-24}")"
-        perguntar WAN_GW   "Gateway padrão"  "$WAN_GW_ATUAL"
+        _WAN_IP_SUG="$(echo "$WAN_IP_ATUAL" | cut -d/ -f1)"
+        perguntar WAN_IP "IP estático WAN" "$_WAN_IP_SUG"
+        while ! valida_ip "$WAN_IP"; do
+            aviso "IP inválido: '${WAN_IP}'"
+            perguntar WAN_IP "IP estático WAN" "$_WAN_IP_SUG"
+        done
+
+        _WAN_MASK_SUG="$(mascara_de_prefixo "${WAN_PREF:-24}")"
+        perguntar WAN_MASK "Máscara de rede" "$_WAN_MASK_SUG"
+        while ! valida_mascara "$WAN_MASK"; do
+            aviso "Máscara inválida: '${WAN_MASK}' — ex.: 255.255.255.0"
+            perguntar WAN_MASK "Máscara de rede" "$_WAN_MASK_SUG"
+        done
         WAN_PREF=$(prefixo_de_mascara "$WAN_MASK")
-        ok "WAN: $WAN_IP / $WAN_MASK via $WAN_GW"
+
+        # Sem gateway padrão o servidor não alcança a internet — e é essa a
+        # razão de ele existir. Vazio é aceito, mas com o aviso na tela, e
+        # nesse caso a linha 'gateway' NÃO vai para o interfaces: escrever
+        # "gateway" sem valor faz o ifup abortar a interface inteira no boot.
+        perguntar WAN_GW "Gateway padrão (vazio = sem rota para a internet)" "$WAN_GW_ATUAL"
+        while [ -n "$WAN_GW" ] && ! gateway_valido "$WAN_GW" "$WAN_IP" "$WAN_PREF"; do
+            perguntar WAN_GW "Gateway padrão (vazio = sem rota para a internet)" "$WAN_GW_ATUAL"
+        done
+        [ -n "$WAN_GW" ] || aviso "Sem gateway padrão: este servidor não sairá para a internet."
+        ok "WAN: $WAN_IP / $WAN_MASK via ${WAN_GW:-sem gateway}"
     fi
 
 else
@@ -480,7 +504,7 @@ else
                 echo "iface ${IFACE_WAN} inet static"
                 echo "    address ${WAN_IP}"
                 echo "    netmask ${WAN_MASK}"
-                echo "    gateway ${WAN_GW}"
+                [ -n "${WAN_GW:-}" ] && echo "    gateway ${WAN_GW}"
             fi
             echo ""
             echo "# LAN — rede interna (IP fixo — este servidor é o gateway)"
