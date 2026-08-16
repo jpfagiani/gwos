@@ -5,7 +5,7 @@
 # Instala o BIND9 como resolver recursivo da LAN, com:
 #   - encaminhamento para resolvers públicos (8.8.8.8 / 1.1.1.1)
 #   - RPZ ativa (bloqueio de domínios por DNS)
-#   - forward zones para os DNS internos do governo
+#   - zonas dos domínios com DNS próprio, vindas do perfil da unidade
 #
 # Sozinho: DNS funcional para a LAN, com bloqueio por RPZ editável à mão em
 #          /etc/bind/db.rpz.gwos.
@@ -163,6 +163,31 @@ else
     else
         aviso "Não foi possível escrever /etc/resolv.conf — deixado como estava."
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Domínios com DNS próprio, vindos do perfil da unidade
+# ---------------------------------------------------------------------------
+# Ficam em named.conf.zonas-locais (preservado entre reinstalações), não no
+# named.conf.local (regravado). Zona que já existe é mantida como está.
+if [ -n "${ZONAS_INTERNAS:-}" ] && [ -x /usr/local/sbin/gwos-zona ]; then
+    titulo "── Domínios internos ──"
+    for _par in $ZONAS_INTERNAS; do
+        _dom="${_par%%:*}"
+        _ips="${_par#*:}"
+        _ips="${_ips//,/ }"
+        if [ -z "$_dom" ] || [ "$_dom" = "$_par" ]; then
+            aviso "Entrada ignorada (formato dominio:ip): '${_par}'"
+            continue
+        fi
+        if /usr/local/sbin/gwos-zona listar 2>/dev/null | cut -f1 | grep -qx "$_dom"; then
+            info "Zona ${_dom} já existe — mantida."
+        elif /usr/local/sbin/gwos-zona adicionar "$_dom" "$_ips" >/dev/null 2>&1; then
+            ok "${_dom} → ${_ips}"
+        else
+            aviso "Não foi possível criar a zona ${_dom} (verifique os IPs)."
+        fi
+    done
 fi
 
 registrar_modulo dns-bind9

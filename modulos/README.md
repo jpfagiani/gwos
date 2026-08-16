@@ -21,6 +21,38 @@ bash modulos/20-dns-bind9/instalar.sh
 bash modulos/verificar-todos.sh
 ```
 
+## Perfis de unidade
+
+O que muda de uma unidade prisional para outra — DNS interno, servidor de hora,
+domínios da intranet — não fica no código: fica em `modulos/perfis/`.
+
+```bash
+ls modulos/perfis/
+# cdpni.conf  exemplo.conf.modelo
+```
+
+O módulo `00-base` lista os perfis e pergunta qual usar; escolhido um, ele
+preenche os padrões das perguntas seguintes. Para uma unidade nova:
+
+```bash
+cp modulos/perfis/exemplo.conf.modelo modulos/perfis/minha-unidade.conf
+# edite os valores e rode a instalação — o perfil aparece na lista
+```
+
+Um perfil define:
+
+| Chave | O que é |
+|-------|---------|
+| `DOMINIO_LOCAL` | Domínio dos nomes da LAN |
+| `DNS_FORWARDERS` | Resolvers para tudo que não é domínio interno |
+| `ZONAS_INTERNAS` | `dominio:ip` dos domínios com DNS próprio |
+| `NTP_SERVIDORES` | Servidor de hora da rede |
+| `NTP_POOL` | Pool público de reserva |
+
+Sem perfil, o instalador pergunta cada um — com padrões neutros (resolvers
+públicos, sem zonas internas, só o pool de hora). Nada é específico de
+unidade nenhuma no código.
+
 ## Quantas placas de rede você precisa
 
 | Módulos | Placas |

@@ -16,30 +16,16 @@ zone "rpz.gwos" {
 };
 
 // ---------------------------------------------------------
-// Forward zones para domínios internos do governo
-// Encaminha para os DNS internos corretos em vez dos forwarders externos
+// Domínios com DNS próprio (intranet do governo, sistemas
+// internos) NÃO ficam aqui: são específicos de cada unidade e
+// este arquivo é sobrescrito a cada reinstalação do módulo.
+//
+// Eles vêm de ZONAS_INTERNAS no /etc/gwos/gwos.conf — definido
+// pelo perfil da unidade (modulos/perfis/) ou perguntado na
+// instalação — e são criados em named.conf.zonas-locais.
+//
+// Para acrescentar depois:  gwos-zona adicionar <dominio> "<ip>"
 // ---------------------------------------------------------
-
-// Cartório SAP — DNS interno: 10.1.6.222
-zone "cartoriosap.sp.gov.br" {
-    type forward;
-    forward only;
-    forwarders { 10.1.6.222; };
-};
-
-// Polícia Penal (GPU) — DNS interno: 10.14.8.20
-zone "policiapenal.sp.gov.br" {
-    type forward;
-    forward only;
-    forwarders { 10.14.8.20; };
-};
-
-// PRODESP — DNS interno: 10.1.6.222
-zone "prodesp.sp.gov.br" {
-    type forward;
-    forward only;
-    forwarders { 10.1.6.222; };
-};
 
 // ---------------------------------------------------------
 // Integração com os demais módulos do GWOS.

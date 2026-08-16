@@ -135,15 +135,21 @@ REDE2_MASK=${REDE2_MASK:-255.255.255.0}
 # ── Nomes internos ──────────────────────────────────────────────────────
 DOMINIO_LOCAL=${DOMINIO_LOCAL:-cdpni.local}
 
-# ── Resolvers upstream do BIND9 (ordem: internos, depois públicos) ──────
-# Os domínios internos do governo têm encaminhamento fixo por zona em
-# /etc/bind/named.conf.local — esta lista é para todo o resto.
-DNS_FORWARDERS="${DNS_FORWARDERS:-10.14.8.20 10.14.8.16 10.1.6.222 8.8.8.8 8.8.4.4 1.1.1.1}"
+# ── Resolvers upstream do BIND9 ─────────────────────────────────────────
+# Padrão neutro: resolvers públicos. Os DNS internos da sua unidade entram
+# aqui pelo perfil (modulos/perfis/) ou pelas perguntas do módulo 00-base.
+DNS_FORWARDERS="${DNS_FORWARDERS:-8.8.8.8 8.8.4.4 1.1.1.1}"
+
+# ── Zonas internas: domínio:ip[,ip] separados por espaço ────────────────
+# Domínios que devem ser resolvidos por um DNS específico, não pelos
+# forwarders acima. Ex.: "prodesp.sp.gov.br:10.1.6.222 outro.gov.br:10.2.3.4"
+# O módulo 20-dns-bind9 transforma isto em zonas de encaminhamento.
+ZONAS_INTERNAS="${ZONAS_INTERNAS:-}"
 
 # ── Fontes de hora do chrony ────────────────────────────────────────────
-# NTP_SERVIDORES é a fonte preferida (servidor interno da rede);
-# NTP_POOL é a reserva, para o relógio não derivar se ela cair.
-NTP_SERVIDORES="${NTP_SERVIDORES:-10.14.8.20}"
+# NTP_SERVIDORES é a fonte preferida (servidor de hora da sua rede); vazio
+# significa usar só o pool público. NTP_POOL é a reserva.
+NTP_SERVIDORES="${NTP_SERVIDORES:-}"
 NTP_POOL="${NTP_POOL:-pool.ntp.br}"
 
 # ── Painel ──────────────────────────────────────────────────────────────
@@ -217,6 +223,32 @@ garantir_conf() {
     detectar_rede
     [ "$antes" = "${IFACE_WAN}${IFACE_LAN}${REDE_LAN}${IP_GATEWAY}" ] || escrever_conf
     carregar_conf
+}
+
+# ----------------------------------------------------------------------------
+# Perfis de unidade
+# ----------------------------------------------------------------------------
+# Cada unidade tem DNS interno, servidor de hora e domínios próprios. Em vez
+# de fixá-los no código, ficam em modulos/perfis/<unidade>.conf — assim o
+# mesmo repositório serve a qualquer unidade sem editar script nenhum.
+GWOS_PERFIS_DIR="${GWOS_MODULOS_DIR}/perfis"
+
+listar_perfis() {
+    [ -d "$GWOS_PERFIS_DIR" ] || return 0
+    local arq
+    for arq in "$GWOS_PERFIS_DIR"/*.conf; do
+        [ -f "$arq" ] || continue
+        basename "$arq" .conf
+    done | sort
+}
+
+# carregar_perfil <nome> — define as variáveis do perfil no ambiente atual
+carregar_perfil() {
+    local arq="${GWOS_PERFIS_DIR}/${1}.conf"
+    [ -f "$arq" ] || return 1
+    # shellcheck disable=SC1090
+    set -a; . "$arq"; set +a
+    return 0
 }
 
 # Todas as redes internas conhecidas (principal + secundária), separadas por espaço

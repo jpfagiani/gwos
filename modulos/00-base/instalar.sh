@@ -187,10 +187,57 @@ if confirmar "Configurar rede secundária?"; then
     ok "Alias: ${IFACE_LAN}:1  IP: ${IP_ALIAS}  Rede: ${REDE2_CIDR}"
 fi
 
-# --- Domínio interno --------------------------------------------------------
-titulo "── Domínio interno ──"
+# --- Perfil da unidade ------------------------------------------------------
+# DNS interno, servidor de hora e domínios da intranet mudam de uma unidade
+# para outra. Ficam em modulos/perfis/<unidade>.conf, para o mesmo repositório
+# servir a qualquer unidade sem editar script.
+titulo "── Perfil da unidade ──"
 echo ""
-perguntar DOMINIO_LOCAL "Domínio dos nomes da LAN" "${DOMINIO_LOCAL:-cdpni.local}"
+
+mapfile -t PERFIS < <(listar_perfis)
+if [ ${#PERFIS[@]} -gt 0 ]; then
+    echo "  Perfis disponíveis:"
+    IDX=1
+    for perfil in "${PERFIS[@]}"; do
+        printf "    %d) %s
+" "$IDX" "$perfil"
+        IDX=$((IDX + 1))
+    done
+    printf "    %d) %s
+" "$IDX" "nenhum — perguntar tudo"
+    echo ""
+    perguntar ESCOLHA "Perfil" "1"
+
+    if [[ "$ESCOLHA" =~ ^[0-9]+$ ]] && [ "$ESCOLHA" -ge 1 ] && [ "$ESCOLHA" -le ${#PERFIS[@]} ]; then
+        PERFIL="${PERFIS[$((ESCOLHA - 1))]}"
+        carregar_perfil "$PERFIL" && ok "Perfil '${PERFIL}' carregado."             || aviso "Não foi possível ler o perfil '${PERFIL}'."
+    else
+        info "Sem perfil — os valores serão perguntados."
+    fi
+else
+    aviso "Nenhum perfil em modulos/perfis/ — os valores serão perguntados."
+fi
+
+# --- Domínio, DNS e hora ----------------------------------------------------
+# O perfil preenche os padrões; o que ele não trouxer, é perguntado aqui.
+titulo "── Nomes, DNS e hora ──"
+echo ""
+perguntar DOMINIO_LOCAL "Domínio dos nomes da LAN" "${DOMINIO_LOCAL:-local}"
+
+echo ""
+echo "  Resolvers para onde vai tudo que não é domínio interno."
+echo "  Se a unidade tem DNS próprio, ponha-o primeiro."
+perguntar DNS_FORWARDERS "Resolvers (separados por espaço)"           "${DNS_FORWARDERS:-8.8.8.8 8.8.4.4 1.1.1.1}"
+
+echo ""
+echo "  Domínios com DNS próprio, no formato dominio:ip — separados por espaço."
+echo "  Ex.: sistema.sp.gov.br:10.1.6.222   (vazio = nenhum)"
+perguntar ZONAS_INTERNAS "Domínios internos" "${ZONAS_INTERNAS:-}"
+
+echo ""
+echo "  Servidor de hora da rede (vazio = só o pool público)."
+perguntar NTP_SERVIDORES "Servidor NTP" "${NTP_SERVIDORES:-}"
+perguntar NTP_POOL       "Pool de reserva" "${NTP_POOL:-pool.ntp.br}"
 
 # --- WAN --------------------------------------------------------------------
 titulo "── Configuração da WAN ──"
@@ -228,6 +275,9 @@ echo -e "  LAN            : ${BOLD}${IFACE_LAN}${NC}"
 echo -e "  Rede LAN       : ${BOLD}${REDE_LAN}${NC}"
 echo -e "  IP Gateway     : ${BOLD}${IP_GATEWAY}${NC}"
 echo -e "  Domínio interno: ${BOLD}${DOMINIO_LOCAL}${NC}"
+echo -e "  Resolvers      : ${BOLD}${DNS_FORWARDERS}${NC}"
+[ -n "${ZONAS_INTERNAS:-}" ] && echo -e "  Domínios internos: ${BOLD}${ZONAS_INTERNAS}${NC}"
+echo -e "  Hora           : ${BOLD}${NTP_SERVIDORES:-(só pool)} + ${NTP_POOL}${NC}"
 [ "$REDE2_ATIVO" = "1" ] && \
     echo -e "  Rede 2         : ${BOLD}${REDE2_CIDR}  alias ${IFACE_LAN}:1 → ${IP_ALIAS}${NC}"
 echo ""
