@@ -21,6 +21,34 @@ bash modulos/20-dns-bind9/instalar.sh
 bash modulos/verificar-todos.sh
 ```
 
+## Convenção de nomes dos portais
+
+Uma unidade costuma ter mais de um portal web. Todos seguem
+`portal-<o que administra>`, sem citar a unidade — o mesmo código serve a
+qualquer presídio, e o prefixo comum agrupa os três:
+
+| Portal | Nome de sistema | Repositório |
+|--------|-----------------|-------------|
+| Gateway | `portal-gateway` | este (`modulos/60-painel-web`) |
+| Servidor de arquivos | `portal-samba` | `jpfagiani/smb` |
+| Sistemas externos | `portal-sistemas` | `jpfagiani/portal` |
+
+```bash
+systemctl status 'portal-*'      # os três de uma vez
+```
+
+O nome de **acesso** é outra coisa, e deve ser curto — é o que as pessoas
+digitam:
+
+```bash
+gwos dns add gateway  10.14.29.15
+gwos dns add samba    172.14.29.11
+gwos dns add sistemas 10.14.29.8
+```
+
+Para `http://gateway` funcionar sem o domínio completo, entregue o sufixo de
+busca aos clientes pela opção 15 do DHCP (`domain-name = cdpni.local`).
+
 ## Perfis de unidade
 
 O que muda de uma unidade prisional para outra — DNS interno, servidor de hora,

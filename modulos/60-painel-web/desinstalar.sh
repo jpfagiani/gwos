@@ -23,7 +23,7 @@ REPO="$(raiz_projeto || true)"
 # sai antes de qualquer decisão sobre o serviço.
 # Inclui o nome antigo 'gwos', de instalações feitas antes da convenção
 # <servidor>-portal.
-for _site in gwos-portal gwos; do
+for _site in portal-gateway gwos-portal gwos; do
     rm -f "/etc/nginx/sites-available/${_site}" "/etc/nginx/sites-enabled/${_site}"
 done
 ok "Site do painel removido do nginx."

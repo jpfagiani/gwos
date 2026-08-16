@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# GWOS — Gera o site nginx do painel (gwos-portal)
+# GWOS — Gera o site nginx do painel (portal-gateway)
 # Instalado como /usr/local/sbin/gwos-gerar-nginx
 # ============================================================================
 # A porta vem de PAINEL_PORTA em /etc/gwos/gwos.conf. Antes o vhost só era
@@ -28,7 +28,7 @@ done
 exigir_root
 garantir_conf
 
-SITE="gwos-portal"
+SITE="portal-gateway"
 DISPONIVEL="/etc/nginx/sites-available/${SITE}"
 HABILITADO="/etc/nginx/sites-enabled/${SITE}"
 
@@ -56,7 +56,7 @@ if [ "$(nginx_outros_sites)" -gt 0 ]; then
     PADRAO=""
 elif grep -rlq "listen[^;]*${PAINEL_PORTA}[^;]*default_server" /etc/nginx/sites-enabled/ 2>/dev/null; then
     OUTRO=$(grep -rl "listen[^;]*${PAINEL_PORTA}[^;]*default_server" /etc/nginx/sites-enabled/ 2>/dev/null \
-            | grep -vE "/(gwos|${SITE})$" | head -1)
+            | grep -vE "/(gwos|gwos-portal|${SITE})$" | head -1)
     [ -n "$OUTRO" ] && PADRAO=""
 fi
 

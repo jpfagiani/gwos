@@ -162,9 +162,11 @@ if [ -e /etc/nginx/sites-enabled/default ]; then
     fi
 fi
 
-# Instalação anterior usava o nome 'gwos' — dois vhosts do mesmo painel na
-# mesma porta faria o nginx recusar a configuração.
-rm -f /etc/nginx/sites-enabled/gwos /etc/nginx/sites-available/gwos
+# Nomes que o vhost já teve. Dois vhosts do mesmo painel na mesma porta
+# faria o nginx recusar a configuração inteira.
+for _antigo in gwos gwos-portal; do
+    rm -f "/etc/nginx/sites-enabled/${_antigo}" "/etc/nginx/sites-available/${_antigo}"
+done
 
 install -m 755 "${MOD_DIR}/gerar-nginx.sh" /usr/local/sbin/gwos-gerar-nginx
 
