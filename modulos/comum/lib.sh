@@ -84,8 +84,38 @@ rede_de_ip() {
     echo "$(( (na>>24)&0xFF )).$(( (na>>16)&0xFF )).$(( (na>>8)&0xFF )).$(( na&0xFF ))/${pref}"
 }
 
-valida_ip()   { echo "$1" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; }
-valida_cidr() { echo "$1" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$'; }
+# Octetos 0-255 e prefixo 0-32 de verdade. A versão anterior só conferia o
+# formato, então '999.1.1.1' e '10.0.0.1/99' passavam e só quebravam depois.
+_OCT='(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])'
+valida_ip()   { echo "$1" | grep -qE "^(${_OCT}\.){3}${_OCT}$"; }
+valida_cidr() { echo "$1" | grep -qE "^(${_OCT}\.){3}${_OCT}/(3[0-2]|[12]?[0-9])$"; }
+
+# Um gateway é o vizinho que leva o tráfego para fora: precisa existir na
+# mesma rede do IP desta máquina. Sem esta checagem dava para responder
+# 127.0.0.1 e o instalador gravava "via 127.0.0.1" sem reclamar — a máquina
+# aceita a rota e simplesmente não sai da rede.
+gateway_valido() {
+    local gw="$1" ip="$2" pref="$3" rede
+    if ! valida_ip "$gw"; then
+        aviso "Gateway inválido: '${gw}'"
+        return 1
+    fi
+    case "$gw" in
+        127.*)   aviso "127.x é o próprio computador — não leva a rede a lugar nenhum."; return 1 ;;
+        0.0.0.0) aviso "0.0.0.0 não é um gateway."; return 1 ;;
+    esac
+    if [ "$gw" = "$ip" ]; then
+        aviso "O gateway não pode ser o IP desta máquina (${ip})."
+        return 1
+    fi
+    rede="$(rede_de_ip "$ip" "$pref")"
+    if [ "$(rede_de_ip "$gw" "$pref")" != "$rede" ]; then
+        aviso "O gateway ${gw} está fora da rede ${rede}."
+        echo  "      Ele precisa ser um vizinho na mesma rede deste servidor."
+        return 1
+    fi
+    return 0
+}
 
 listar_ifaces() {
     ip -o link show 2>/dev/null \

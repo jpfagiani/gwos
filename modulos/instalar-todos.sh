@@ -123,6 +123,7 @@ echo -e "${BOLD}${CYAN}═══════════════════
 FALHOU=()
 INSTALADOS=()
 PULADOS=()
+CANCELADO=0
 
 for m in "${ORDEM[@]}"; do
     selecionado "$m" || continue
@@ -137,13 +138,37 @@ for m in "${ORDEM[@]}"; do
         2)  # O módulo decidiu que não se aplica a esta máquina (ex.: 00-base
             # numa máquina de uma placa só). Não é erro — segue em frente.
             PULADOS+=("$m") ;;
+        3)  # Cancelado pelo usuário no resumo. Seguir para os próximos
+            # módulos seria pior que parar: sem o gwos.conf que este módulo
+            # escreveria, os seguintes adivinham a rede e acertam raramente.
+            CANCELADO=1
+            echo ""
+            aviso "Módulo ${m} cancelado — a instalação para por aqui."
+            echo "      Nada do que viria depois foi instalado."
+            echo "      Para recomeçar: bash modulos/instalar-todos.sh --escolher"
+            break ;;
         *)  FALHOU+=("$m")
             falha "Módulo ${m} falhou (código ${CODIGO})."
             confirmar "Continuar com os próximos módulos?" || break ;;
     esac
 done
 
-# Passe final de integração: agora que todos existem, refaz as amarrações
+# Passe final de integração: agora que todos existem, refaz as amarrações.
+# Numa instalação cancelada não há o que amarrar.
+# Cancelado: nada foi amarrado e nada foi instalado. O resumo de sucesso
+# abaixo (com senha, endereços do painel e "Servidor: ?.?") só confundiria.
+if [ "$CANCELADO" = "1" ]; then
+    echo ""
+    echo -e "${BOLD}${YELLOW}══════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}${BOLD}  Instalação cancelada — nada foi alterado.${NC}"
+    echo -e "${BOLD}${YELLOW}══════════════════════════════════════════════${NC}"
+    echo ""
+    [ ${#INSTALADOS[@]} -gt 0 ] &&         echo -e "  Já estavam instalados antes do cancelamento: ${BOLD}${INSTALADOS[*]}${NC}"
+    echo -e "  Recomeçar: ${BOLD}bash ${MOD_DIR}/instalar-todos.sh --escolher${NC}"
+    echo ""
+    exit 1
+fi
+
 integrar
 
 echo ""

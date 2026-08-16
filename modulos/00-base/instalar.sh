@@ -112,6 +112,20 @@ fi
 ok "Papel: ${PAPEL}"
 
 # ===========================================================================
+# 3 a 7. Perguntas  —  tudo daqui até "Aplicar esta configuração?"
+# ---------------------------------------------------------------------------
+# Fica dentro deste laço: quem responde "refazer" no resumo volta para cá, com
+# as respostas anteriores já como padrão. Antes, responder "não" no resumo
+# encerrava o módulo com sucesso (exit 0) e a instalação seguia SEM o
+# /etc/gwos/gwos.conf — os módulos seguintes então adivinhavam a rede, e
+# adivinhavam errado (WAN=LAN, gateway = o IP antigo da máquina).
+#
+# O corpo não é indentado de propósito: são ~230 linhas, e indentar tudo
+# esconderia a mudança real no meio de um diff gigante.
+# ===========================================================================
+while true; do
+
+# ===========================================================================
 # 3. Perfil da unidade
 # ===========================================================================
 titulo "── Perfil da unidade ──"
@@ -127,7 +141,7 @@ if [ ${#PERFIS[@]} -gt 0 ]; then
     done
     printf "    %d) %s\n" "$IDX" "nenhum — perguntar tudo"
     echo ""
-    perguntar ESCOLHA "Perfil" "1"
+    perguntar ESCOLHA "Perfil" "${ESCOLHA:-1}"
 
     if [[ "$ESCOLHA" =~ ^[0-9]+$ ]] && [ "$ESCOLHA" -ge 1 ] && [ "$ESCOLHA" -le ${#PERFIS[@]} ]; then
         PERFIL="${PERFIS[$((ESCOLHA - 1))]}"
@@ -179,7 +193,9 @@ if [ "$PAPEL" = "gateway" ]; then
         aviso "WAN e LAN não podem ser a mesma interface — um gateway roteia de"
         aviso "uma placa para a outra."
         echo "  Interfaces disponíveis: ${IFACES[*]}"
-        exit 1
+        echo ""
+        # Dentro do laço de perguntas: volta ao início em vez de abortar.
+        continue
     fi
     ok "LAN: $IFACE_LAN"
 
@@ -285,8 +301,11 @@ else
             done
             perguntar SRV_MASK "Máscara de rede" "$(mascara_de_prefixo "${PREF_ATUAL:-24}")"
             SRV_PREF=$(prefixo_de_mascara "$SRV_MASK")
-            perguntar SRV_GW "Gateway da rede" "${GW_ATUAL:-}"
             REDE_LAN=$(rede_de_ip "$IP_GATEWAY" "$SRV_PREF")
+            perguntar SRV_GW "Gateway da rede (vazio = sem gateway)" "${GW_ATUAL:-}"
+            while [ -n "$SRV_GW" ] && ! gateway_valido "$SRV_GW" "$IP_GATEWAY" "$SRV_PREF"; do
+                perguntar SRV_GW "Gateway da rede (vazio = sem gateway)" "${GW_ATUAL:-}"
+            done
             ok "IP fixo: ${IP_GATEWAY}/${SRV_PREF}  rede ${REDE_LAN}  via ${SRV_GW:-sem gateway}"
             ;;
         3)
@@ -299,7 +318,12 @@ else
             SRV_MODO="manter"
             IP_GATEWAY=$(echo "$IP_ATUAL_CIDR" | cut -d/ -f1)
             REDE_LAN=$(rede_de_ip "${IP_GATEWAY:-192.168.1.10}" "$(echo "${IP_ATUAL_CIDR:-x/24}" | cut -d/ -f2)")
-            [ -n "$IP_GATEWAY" ] || erro "A interface não tem IP — escolha 2 (IP fixo) ou 3 (DHCP)."
+            if [ -z "$IP_GATEWAY" ]; then
+                aviso "A interface ${IFACE_LAN} não tem IP — 'manter como está' não dá."
+                echo  "      Escolha 2 (IP fixo) ou 3 (DHCP)."
+                echo ""
+                continue
+            fi
             ok "Rede mantida: ${IP_GATEWAY} na rede ${REDE_LAN}"
             ;;
     esac
@@ -348,7 +372,29 @@ echo -e "  Resolvers      : ${BOLD}${DNS_FORWARDERS}${NC}"
 [ -n "${ZONAS_INTERNAS:-}" ] && echo -e "  Dom. internos  : ${BOLD}${ZONAS_INTERNAS}${NC}"
 echo -e "  Hora           : ${BOLD}${NTP_SERVIDORES:-(só pool)} + ${NTP_POOL}${NC}"
 echo ""
-confirmar "Aplicar esta configuração?" || { echo "Cancelado."; exit 0; }
+if [ "${GWOS_SEM_PERGUNTAS:-0}" = "1" ]; then
+    echo "  Aplicar esta configuração? [s/n/c]: s  (automático)"
+    break
+fi
+
+RESPOSTA=""
+while [[ ! "$RESPOSTA" =~ ^[SsNnCc]$ ]]; do
+    read -rp "  [s] aplicar   [n] refazer as perguntas   [c] cancelar: " RESPOSTA
+done
+
+case "$RESPOSTA" in
+    [Ss]) break ;;
+    [Cc]) echo ""
+          echo "Cancelado — nada foi alterado."
+          # 3 = cancelado pelo usuário. O orquestrador para a instalação aqui,
+          # em vez de seguir para módulos que dependem deste.
+          exit 3 ;;
+    *)    echo ""
+          aviso "Vamos refazer as perguntas — as respostas atuais ficam como padrão."
+          echo "" ;;
+esac
+
+done   # fim do laço de perguntas
 
 # ===========================================================================
 # 8. Hostname
