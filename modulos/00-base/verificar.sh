@@ -14,6 +14,7 @@ done
 carregar_conf
 FALHAS=0
 titulo "── Verificação: 00-base ──"
+info "Papel: ${PAPEL:-servidor}  |  Servidor: ${NOME_SERVIDOR:-?}.${DOMINIO_LOCAL:-?}"
 
 if [ -f "$GWOS_CONF" ]; then
     ok "Estado presente: ${GWOS_CONF}"
@@ -22,8 +23,10 @@ else
     falha "Ausente: ${GWOS_CONF}"; FALHAS=$((FALHAS+1))
 fi
 
-for IF in "${IFACE_WAN:-}" "${IFACE_LAN:-}"; do
-    [ -z "$IF" ] && continue
+# Em modo servidor a WAN e a LAN são a mesma placa — listar duas vezes só
+# confunde quem lê o relatório.
+IFACES_UNICAS=$(echo "${IFACE_WAN:-} ${IFACE_LAN:-}" | tr ' ' '\n' | grep -v '^$' | sort -u)
+for IF in $IFACES_UNICAS; do
     if ip link show "$IF" &>/dev/null; then
         EST=$(cat "/sys/class/net/${IF}/operstate" 2>/dev/null || echo "?")
         IPS=$(ip -4 -o addr show "$IF" 2>/dev/null | awk '{print $4}' | paste -sd ' ' -)
@@ -39,10 +42,19 @@ else
     falha "IP ${IP_GATEWAY:-?} não está atribuído a nenhuma interface."; FALHAS=$((FALHAS+1))
 fi
 
-if [ "$(sysctl -n net.ipv4.ip_forward 2>/dev/null)" = "1" ]; then
-    ok "Encaminhamento de pacotes (ip_forward) ativo."
+# Só o gateway roteia. Num servidor de DNS ou hora, ip_forward LIGADO é que
+# seria estranho — antes esta checagem acusava erro em toda máquina que não
+# fosse gateway.
+if [ "${PAPEL:-servidor}" = "gateway" ]; then
+    if [ "$(sysctl -n net.ipv4.ip_forward 2>/dev/null)" = "1" ]; then
+        ok "Encaminhamento de pacotes (ip_forward) ativo."
+    else
+        falha "ip_forward desativado — o gateway não roteia."; FALHAS=$((FALHAS+1))
+    fi
+elif [ "$(sysctl -n net.ipv4.ip_forward 2>/dev/null)" = "1" ]; then
+    aviso "ip_forward ativo numa máquina que não é gateway — verifique se é intencional."
 else
-    falha "ip_forward desativado — a máquina não roteia."; FALHAS=$((FALHAS+1))
+    ok "Modo servidor: sem encaminhamento de pacotes (correto)."
 fi
 
 if ip route show default 2>/dev/null | grep -q .; then
