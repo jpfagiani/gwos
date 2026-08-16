@@ -218,8 +218,37 @@ fi
 # ---------------------------------------------------------------------------
 # Sudo — o painel roda como www-data e precisa aplicar as regras
 # ---------------------------------------------------------------------------
-grep -q '@includedir /etc/sudoers.d' /etc/sudoers || echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+# O sudo é dependência dura do painel: ele roda como www-data e aplica as
+# regras chamando scripts por sudo. Numa instalação mínima do Debian o pacote
+# pode simplesmente não existir — e aí não há /etc/sudoers nem /etc/sudoers.d,
+# e a escrita do arquivo de permissões falha no meio da instalação.
+instalar_pacotes sudo
 
+[ -f /etc/sudoers ] || erro "/etc/sudoers não existe mesmo após instalar o sudo — instalação abortada."
+
+# O diretório vem com o pacote, mas pode ter sido removido. Modo 0750 é o que
+# o sudo exige; mais permissivo que isso ele recusa ler.
+mkdir -p /etc/sudoers.d
+chmod 0750 /etc/sudoers.d
+
+# Acrescentar o @includedir num /etc/sudoers válido é seguro; num arquivo
+# quebrado, não. Por isso a alteração é validada antes de valer — um sudoers
+# inválido tranca o sudo da máquina inteira, inclusive para consertar.
+if ! grep -q '^@includedir /etc/sudoers.d' /etc/sudoers; then
+    SUDOERS_BAK="$(mktemp /tmp/gwos_sudoers.XXXXXX)"
+    cp -a /etc/sudoers "$SUDOERS_BAK"
+    echo '@includedir /etc/sudoers.d' >> /etc/sudoers
+    if visudo -c -f /etc/sudoers >/dev/null 2>&1; then
+        rm -f "$SUDOERS_BAK"
+        ok "/etc/sudoers passa a carregar o sudoers.d."
+    else
+        cp -a "$SUDOERS_BAK" /etc/sudoers
+        rm -f "$SUDOERS_BAK"
+        erro "A alteração em /etc/sudoers foi reprovada — arquivo restaurado."
+    fi
+fi
+
+SUDOERS_TMP="$(mktemp /tmp/gwos_sudoers_gwos.XXXXXX)"
 {
     echo "Defaults:www-data !requiretty"
     for s in aplicar_nftables aplicar_nat aplicar_bind9_rpz gerar_squid_dominios \
@@ -235,12 +264,19 @@ grep -q '@includedir /etc/sudoers.d' /etc/sudoers || echo '@includedir /etc/sudo
     echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-zona"
     # Leitura e recarga dos serviços, com par (ação, módulo) de lista fechada
     echo "www-data ALL=(root) NOPASSWD: /usr/local/sbin/gwos-servico"
-} > /etc/sudoers.d/gwos
-chmod 440 /etc/sudoers.d/gwos
-visudo -c -f /etc/sudoers.d/gwos >/dev/null || {
-    rm -f /etc/sudoers.d/gwos
-    erro "sudoers gerado é inválido — arquivo removido para não travar o sudo."
-}
+} > "$SUDOERS_TMP"
+
+# Valida ANTES de pôr em /etc/sudoers.d: um arquivo invalido ali faz o sudo
+# recusar a configuracao inteira, inclusive a do administrador.
+if ! visudo -c -f "$SUDOERS_TMP" >/dev/null 2>&1; then
+    falha "O sudoers gerado é inválido:"
+    visudo -c -f "$SUDOERS_TMP" 2>&1 | sed 's/^/      /' || true
+    rm -f "$SUDOERS_TMP"
+    erro "Nada foi instalado em /etc/sudoers.d — o sudo desta máquina continua intacto."
+fi
+
+install -m 440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/gwos
+rm -f "$SUDOERS_TMP"
 ok "Permissões sudo configuradas."
 
 chmod +x "${REPO}/scripts/"*.sh
