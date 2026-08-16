@@ -185,7 +185,21 @@ ok ".env do painel criado."
 # Usuários do painel em arquivo (só no modo leve)
 # ---------------------------------------------------------------------------
 if [ "$MODO_LEVE" = "1" ]; then
-    ARQ_USUARIOS="/etc/gwos/painel-usuarios.json"
+    # Diretório próprio: a gravação do painel é atômica (tmp + rename) e
+    # criar o .tmp exige escrita NO DIRETÓRIO. Com o arquivo solto em
+    # /etc/gwos (755 root), o www-data lia mas não gravava — e a troca de
+    # senha falhava sem dizer.
+    DIR_PAINEL="/etc/gwos/painel"
+    ARQ_USUARIOS="${DIR_PAINEL}/usuarios.json"
+    mkdir -p "$DIR_PAINEL"
+    chown root:www-data "$DIR_PAINEL"
+    chmod 2770 "$DIR_PAINEL"
+
+    # Instalação anterior guardava o arquivo um nível acima
+    if [ -f /etc/gwos/painel-usuarios.json ] && [ ! -f "$ARQ_USUARIOS" ]; then
+        mv /etc/gwos/painel-usuarios.json "$ARQ_USUARIOS"
+        info "Usuários do painel migrados para ${ARQ_USUARIOS}."
+    fi
     if [ -f "$ARQ_USUARIOS" ]; then
         aviso "Usuários do painel preservados (${ARQ_USUARIOS})."
     else
@@ -213,6 +227,17 @@ USUARIOS
     # O painel precisa escrever aqui (tentativas, bloqueio, troca de senha)
     chown root:www-data "$ARQ_USUARIOS"
     chmod 660 "$ARQ_USUARIOS"
+
+    # Confere de verdade, em vez de supor: um erro aqui só apareceria quando
+    # o administrador tentasse trocar a senha.
+    if sudo -u www-data test -r "$ARQ_USUARIOS" && sudo -u www-data test -w "$DIR_PAINEL"; then
+        ok "www-data lê os usuários e pode gravar em ${DIR_PAINEL}."
+    else
+        aviso "www-data NÃO tem acesso a ${ARQ_USUARIOS} — o login vai falhar."
+        ls -ld "$DIR_PAINEL" "$ARQ_USUARIOS" | sed 's/^/      /'
+    fi
+
+    echo "      Login: admin@gwos.local   Senha: gwos@2025"
 fi
 
 # ---------------------------------------------------------------------------

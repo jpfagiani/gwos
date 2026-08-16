@@ -15,7 +15,13 @@ namespace App\Core;
  */
 class Usuarios
 {
-    private const ARQUIVO = '/etc/gwos/painel-usuarios.json';
+    // Fica num diretório próprio, e não solto em /etc/gwos: a gravação é
+    // atômica (tmp + rename) e criar o .tmp exige permissão de ESCRITA NO
+    // DIRETÓRIO. Com o arquivo direto em /etc/gwos (755 root), o www-data
+    // lia mas não conseguia gravar — e a troca de senha falhava em silêncio.
+    private const DIRETORIO = '/etc/gwos/painel';
+    private const ARQUIVO   = '/etc/gwos/painel/usuarios.json';
+    private const ARQUIVO_ANTIGO = '/etc/gwos/painel-usuarios.json';
 
     public static function usandoBanco(): bool
     {
@@ -54,11 +60,15 @@ class Usuarios
         return null;
     }
 
-    /** @param array<string,mixed> $campos */
-    public static function atualizar(int $id, array $campos): void
+    /**
+     * @param array<string,mixed> $campos
+     * @return bool false quando a gravação falhou — quem troca senha PRECISA
+     *              saber disso, senão avisa o usuário de um sucesso que não houve.
+     */
+    public static function atualizar(int $id, array $campos): bool
     {
         if ($campos === []) {
-            return;
+            return true;
         }
 
         if (self::usandoBanco()) {
@@ -66,7 +76,7 @@ class Usuarios
             $params = array_values($campos);
             $params[] = $id;
             Database::execute("UPDATE admins SET {$sets} WHERE id = ?", $params);
-            return;
+            return true;
         }
 
         $usuarios = self::lerArquivo();
@@ -78,13 +88,13 @@ class Usuarios
             }
         }
         unset($usuario);
-        self::gravarArquivo($usuarios);
+        return self::gravarArquivo($usuarios);
     }
 
     /** Marca o último login com a hora atual (NOW() no banco). */
-    public static function registrarLogin(int $id): void
+    public static function registrarLogin(int $id): bool
     {
-        self::atualizar($id, [
+        return self::atualizar($id, [
             'tentativas'    => 0,
             'bloqueado_ate' => null,
             'ultimo_login'  => date('Y-m-d H:i:s'),
@@ -105,10 +115,12 @@ class Usuarios
 
     private static function lerArquivo(): array
     {
-        if (!is_readable(self::ARQUIVO)) {
+        $caminho = is_readable(self::ARQUIVO) ? self::ARQUIVO
+                 : (is_readable(self::ARQUIVO_ANTIGO) ? self::ARQUIVO_ANTIGO : null);
+        if ($caminho === null) {
             return [];
         }
-        $dados = json_decode((string) @file_get_contents(self::ARQUIVO), true);
+        $dados = json_decode((string) @file_get_contents($caminho), true);
         return is_array($dados) ? $dados : [];
     }
 

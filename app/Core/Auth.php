@@ -107,10 +107,14 @@ class Auth
             return false;
         }
 
-        Usuarios::atualizar($id, [
+        // Se a gravação falhar, dizer que a senha mudou seria mentira — e o
+        // administrador ficaria com a senha padrão achando que a trocou.
+        if (!Usuarios::atualizar($id, [
             'senha'          => password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]),
             'primeiro_login' => 0,
-        ]);
+        ])) {
+            return false;
+        }
 
         $dados = Session::obter(self::CHAVE_SESSAO);
         if ($dados) {
@@ -145,14 +149,12 @@ class Auth
         if (!hash_equals($admin['reset_token'], strtoupper(trim($token)))) return false;
         if (new \DateTime() > new \DateTime($admin['reset_expira'])) return false;
 
-        Usuarios::atualizar((int) $admin['id'], [
+        return Usuarios::atualizar((int) $admin['id'], [
             'senha'          => password_hash($novaSenha, PASSWORD_BCRYPT, ['cost' => 12]),
             'reset_token'    => null,
             'reset_expira'   => null,
             'primeiro_login' => 0,
         ]);
-
-        return true;
     }
 
     public static function mensagemBloqueio(string $email): string|null
