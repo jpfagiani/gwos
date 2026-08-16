@@ -160,9 +160,15 @@ NTP_POOL="${NTP_POOL:-pool.ntp.br}"
 # ── Painel ──────────────────────────────────────────────────────────────
 # Versão do PHP em uso, detectada da distribuição pelo módulo 60-painel-web.
 PHP_VERSAO=${PHP_VERSAO:-}
-# Porta do painel. Vira 8080 (ou a próxima livre) quando a 80 já está ocupada
-# por outro servidor web na mesma máquina — Apache, um portal, outro site.
-PAINEL_PORTA=${PAINEL_PORTA:-80}
+# Porta do painel: 8080 por convenção, em TODA unidade.
+# A padronização vale mais que ganhar a porta 80: quem der suporte a vários
+# presídios encontra sempre o painel no mesmo lugar, e a 80 fica livre para o
+# portal de sistemas, que é o que os usuários acessam.
+#
+#   80    portal-sistemas   (atalhos — todo mundo usa)
+#   8080  portal-gateway    (GWOS — administração)
+#   8443  portal-samba      (arquivos — administração)
+PAINEL_PORTA=${PAINEL_PORTA:-8080}
 
 # ── Portas dos serviços ─────────────────────────────────────────────────
 SQUID_PORTA_FWD=${SQUID_PORTA_FWD:-3127}

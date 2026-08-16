@@ -27,11 +27,19 @@ Uma unidade costuma ter mais de um portal web. Todos seguem
 `portal-<o que administra>`, sem citar a unidade — o mesmo código serve a
 qualquer presídio, e o prefixo comum agrupa os três:
 
-| Portal | Nome de sistema | Repositório |
-|--------|-----------------|-------------|
-| Gateway | `portal-gateway` | este (`modulos/60-painel-web`) |
-| Servidor de arquivos | `portal-samba` | `jpfagiani/smb` |
-| Sistemas externos | `portal-sistemas` | `jpfagiani/portal` |
+| Portal | Nome de sistema | Porta | Repositório |
+|--------|-----------------|-------|-------------|
+| Sistemas externos | `portal-sistemas` | **80** | `jpfagiani/portal` |
+| Gateway | `portal-gateway` | **8080** | este (`modulos/60-painel-web`) |
+| Servidor de arquivos | `portal-samba` | **8443** | `jpfagiani/smb` |
+
+As portas são **fixas em todas as unidades**. Padronizar vale mais que ganhar
+a porta 80: quem dá suporte a vários presídios encontra cada portal sempre no
+mesmo lugar, e a 80 fica para o portal de sistemas — o único que todos os
+usuários acessam, e o único que se digita sem porta na barra de endereços.
+
+O instalador só propõe outra porta se a 8080 estiver ocupada por algo que não
+dá para mover.
 
 ```bash
 systemctl status 'portal-*'      # os três de uma vez

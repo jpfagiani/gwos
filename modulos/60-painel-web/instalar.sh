@@ -93,25 +93,30 @@ salvar_conf PHP_VERSAO "$PHP_VER"
 # ---------------------------------------------------------------------------
 # Nginx — o painel precisa de uma porta só dele
 # ---------------------------------------------------------------------------
-# Numa unidade é comum a mesma máquina hospedar mais de um portal (o de
-# sistemas, o do Samba). Dois deles na porta 80 não convivem: quem subir
-# primeiro fica, o outro entra em laço de reinício. Por isso a porta é
-# PERGUNTADA, com um padrão que já leva em conta o que existe na máquina.
+# Porta 8080 por convenção, em toda unidade — não é um plano B para quando a
+# 80 está ocupada. Padronizar vale mais que ganhar a 80: quem dá suporte a
+# vários presídios encontra o painel sempre no mesmo lugar, e a 80 fica para o
+# portal de sistemas, que é o que os usuários acessam.
 SITES_EXISTENTES="$(nginx_outros_sites)"
-DONO_80="$(porta_em_uso 80)"
+PORTA_PADRAO=8080
+PORTA_SUGERIDA="$PORTA_PADRAO"
 
-if [ "${SITES_EXISTENTES:-0}" -gt 0 ] || { [ -n "$DONO_80" ] && ! echo "$DONO_80" | grep -q nginx; }; then
-    PORTA_SUGERIDA="$(primeira_porta_livre 8080 8081 8090 9080 || echo 8080)"
-    [ "${SITES_EXISTENTES:-0}" -gt 0 ]         && aviso "Esta máquina já serve ${SITES_EXISTENTES} outro(s) site(s) no nginx."         || aviso "A porta 80 já está em uso por: ${DONO_80}"
-    echo "      O painel do GWOS precisa de uma porta própria."
-else
-    PORTA_SUGERIDA=80
+OCUPANTE_PADRAO="$(porta_em_uso "$PORTA_PADRAO")"
+if [ -n "$OCUPANTE_PADRAO" ] && ! echo "$OCUPANTE_PADRAO" | grep -q nginx; then
+    PORTA_SUGERIDA="$(primeira_porta_livre 8081 8090 9080 || echo 8081)"
+    aviso "A porta padrão ${PORTA_PADRAO} está ocupada por: ${OCUPANTE_PADRAO}"
+    echo  "      Liberá-la mantém esta máquina igual às demais unidades."
 fi
 
 titulo "── Porta do painel ──"
 echo ""
-echo "  Em quem já usa a 80 para outro portal, escolha 8080 (ou outra)."
-echo "  Depois dá para mudar com: gwos-definir PAINEL_PORTA <porta>"
+echo "  Convenção do projeto, igual em todas as unidades:"
+echo "     80    portal-sistemas  (atalhos — todos os usuários)"
+echo "     8080  portal-gateway   (este painel — administração)"
+echo "     8443  portal-samba     (arquivos — administração)"
+echo ""
+echo "  Mude só se a 8080 estiver ocupada por algo que não dá para mover."
+echo "  Depois: gwos-definir PAINEL_PORTA <porta>"
 echo ""
 perguntar PAINEL_PORTA "Porta do painel GWOS" "$PORTA_SUGERIDA"
 
@@ -138,25 +143,13 @@ salvar_conf PAINEL_PORTA "$PAINEL_PORTA"
 # Nada se perde ao desabilitá-lo: ele não serve nada de ninguém.
 if [ -e /etc/nginx/sites-enabled/default ]; then
     if grep -q 'index.nginx-debian.html' /etc/nginx/sites-available/default 2>/dev/null; then
-        # Arquivo de fábrica, não customizado
-        if [ "$PAINEL_PORTA" = "80" ]; then
-            rm -f /etc/nginx/sites-enabled/default
-            info "Site 'default' do Debian removido (o painel assume a porta 80)."
-        else
-            echo ""
-            aviso "O site 'default' do nginx está ocupando a porta 80."
-            echo  "      É a página \"Welcome to nginx!\" de fábrica — não serve nada."
-            echo  "      Enquanto estiver ativa, nenhuma outra aplicação sobe na 80"
-            echo  "      (o portal de sistemas, por exemplo)."
-            if confirmar "Desabilitar o site 'default'?"; then
-                rm -f /etc/nginx/sites-enabled/default
-                nginx -t >/dev/null 2>&1 && systemctl reload nginx 2>/dev/null || true
-                ok "Site 'default' desabilitado — a porta 80 está livre."
-            else
-                aviso "Mantido. Para liberar a 80 depois:"
-                echo  "        rm -f /etc/nginx/sites-enabled/default && systemctl reload nginx"
-            fi
-        fi
+        # Arquivo de fábrica, não customizado. Como o painel fica sempre na
+        # 8080, o 'default' só estaria segurando a 80 — que pela convenção é
+        # do portal de sistemas. Remover é o certo em toda instalação.
+        rm -f /etc/nginx/sites-enabled/default
+        nginx -t >/dev/null 2>&1 && systemctl reload nginx 2>/dev/null || true
+        info "Site 'default' do Debian removido — a porta 80 fica livre para o"
+        info "portal de sistemas (convenção do projeto)."
     else
         aviso "O site 'default' do nginx foi customizado — mantido intacto."
     fi
