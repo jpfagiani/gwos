@@ -68,7 +68,43 @@ if command -v curl >/dev/null 2>&1; then
     esac
 fi
 
-tem_banco || { falha "Módulo 10-banco-mariadb ausente — o painel não tem de onde ler."; FALHAS=$((FALHAS+1)); }
+# ── Em que modo o painel está, e de onde ele lê os usuários ────────────────
+# É a causa mais provável de "e-mail ou senha incorretos": o painel achar que
+# está em modo leve, procurar um arquivo de usuários que não existe e recusar
+# todo login sem nunca consultar o banco.
+if tem_banco; then
+    ok "Módulo de banco instalado — painel em modo completo."
+    if [ -n "$REPO" ] && grep -q '^DB_SENHA=.\+' "${REPO}/.env" 2>/dev/null; then
+        ok "O .env tem credenciais do banco (é por elas que o painel conecta)."
+        if [ -f "$GWOS_DB_CONF" ]; then
+            # shellcheck disable=SC1090
+            . "$GWOS_DB_CONF"
+            N=$(mysql -h"$DB_HOST" -u"$DB_USUARIO" -p"$DB_SENHA" "$DB_BANCO"                 -sNe "SELECT COUNT(*) FROM admins WHERE ativo=1" 2>/dev/null) || N=""
+            if [ -n "$N" ]; then
+                ok "Administradores ativos na tabela: ${N}"
+                PADRAO=$(mysql -h"$DB_HOST" -u"$DB_USUARIO" -p"$DB_SENHA" "$DB_BANCO"                     -sNe "SELECT COUNT(*) FROM admins WHERE senha='\$2y\$12\$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'" 2>/dev/null) || PADRAO=0
+                if [ "${PADRAO:-0}" -gt 0 ]; then
+                    falha "A senha ainda é o hash de EXEMPLO do schema — nenhuma senha funciona."
+                    echo  "       Corrija com: /usr/local/sbin/gwos-senha-padrao"
+                    FALHAS=$((FALHAS+1))
+                fi
+            fi
+        fi
+    else
+        falha "O .env não tem DB_SENHA — o painel cai em modo leve e recusa todo login."
+        echo  "       Reexecute: bash modulos/60-painel-web/instalar.sh"
+        FALHAS=$((FALHAS+1))
+    fi
+else
+    info "Painel em modo leve — usuários em /etc/gwos/painel/usuarios.json"
+    if [ -f /etc/gwos/painel/usuarios.json ] || [ -f /etc/gwos/painel-usuarios.json ]; then
+        ok "Arquivo de usuários presente."
+    else
+        falha "Sem banco e SEM arquivo de usuários — nenhum login é possível."
+        echo  "       Reexecute: bash modulos/60-painel-web/instalar.sh"
+        FALHAS=$((FALHAS+1))
+    fi
+fi
 
 echo ""
 [ "$FALHAS" -eq 0 ] && ok "60-painel-web OK." || falha "60-painel-web com ${FALHAS} problema(s)."

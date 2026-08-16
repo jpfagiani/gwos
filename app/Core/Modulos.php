@@ -196,10 +196,24 @@ class Modulos
         return $lista;
     }
 
-    /** O banco é opcional: sem ele o painel roda em modo leve. */
+    /**
+     * O banco é opcional: sem ele o painel roda em modo leve.
+     *
+     * NÃO testa /etc/gwos/db.conf: aquele arquivo é 0600 root, e o painel roda
+     * como www-data — is_readable() devolvia false mesmo com o MariaDB
+     * instalado. O painel então caía no modo leve, procurava o arquivo de
+     * usuários que não existia e recusava todo login como "senha incorreta",
+     * sem nunca consultar o banco.
+     *
+     * Quem manda é o que o painel realmente usa para conectar: as credenciais
+     * do .env, que o instalador grava legíveis para o www-data.
+     */
     public static function temBanco(): bool
     {
-        return self::temModulo('banco-mariadb') && is_readable('/etc/gwos/db.conf');
+        if (!self::temModulo('banco-mariadb')) {
+            return false;
+        }
+        return (string) config('db.senha', '') !== '';
     }
 
     /**
