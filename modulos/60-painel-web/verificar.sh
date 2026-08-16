@@ -68,6 +68,13 @@ if command -v curl >/dev/null 2>&1; then
     esac
 fi
 
+# ── A porta 80 está sendo desperdiçada pelo placeholder do nginx? ──────────
+if [ -e /etc/nginx/sites-enabled/default ]    && grep -q 'index.nginx-debian.html' /etc/nginx/sites-available/default 2>/dev/null    && [ "${PAINEL_PORTA:-80}" != "80" ]; then
+    aviso "O site 'default' do nginx ocupa a porta 80 sem servir nada."
+    echo  "      Impede outras aplicações (portal de sistemas) de subir ali:"
+    echo  "        rm -f /etc/nginx/sites-enabled/default && systemctl reload nginx"
+fi
+
 # ── Em que modo o painel está, e de onde ele lê os usuários ────────────────
 # É a causa mais provável de "e-mail ou senha incorretos": o painel achar que
 # está em modo leve, procurar um arquivo de usuários que não existe e recusar

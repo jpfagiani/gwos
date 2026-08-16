@@ -129,10 +129,37 @@ done
 
 salvar_conf PAINEL_PORTA "$PAINEL_PORTA"
 
-# O site 'default' de fábrica só sai se o painel assumir a 80 sozinho.
-if [ -e /etc/nginx/sites-enabled/default ]    && [ "${SITES_EXISTENTES:-0}" -eq 0 ] && [ "$PAINEL_PORTA" = "80" ]; then
-    rm -f /etc/nginx/sites-enabled/default
-    info "Site 'default' do Debian removido."
+# ---------------------------------------------------------------------------
+# O site 'default' de fábrica
+# ---------------------------------------------------------------------------
+# Ele escuta na 80 servindo a página "Welcome to nginx!". Se o painel foi para
+# outra porta, esse placeholder fica SEGURANDO a 80 e impede qualquer aplicação
+# de verdade de subir ali — foi o que aconteceu com o portal de sistemas.
+# Nada se perde ao desabilitá-lo: ele não serve nada de ninguém.
+if [ -e /etc/nginx/sites-enabled/default ]; then
+    if grep -q 'index.nginx-debian.html' /etc/nginx/sites-available/default 2>/dev/null; then
+        # Arquivo de fábrica, não customizado
+        if [ "$PAINEL_PORTA" = "80" ]; then
+            rm -f /etc/nginx/sites-enabled/default
+            info "Site 'default' do Debian removido (o painel assume a porta 80)."
+        else
+            echo ""
+            aviso "O site 'default' do nginx está ocupando a porta 80."
+            echo  "      É a página \"Welcome to nginx!\" de fábrica — não serve nada."
+            echo  "      Enquanto estiver ativa, nenhuma outra aplicação sobe na 80"
+            echo  "      (o portal de sistemas, por exemplo)."
+            if confirmar "Desabilitar o site 'default'?"; then
+                rm -f /etc/nginx/sites-enabled/default
+                nginx -t >/dev/null 2>&1 && systemctl reload nginx 2>/dev/null || true
+                ok "Site 'default' desabilitado — a porta 80 está livre."
+            else
+                aviso "Mantido. Para liberar a 80 depois:"
+                echo  "        rm -f /etc/nginx/sites-enabled/default && systemctl reload nginx"
+            fi
+        fi
+    else
+        aviso "O site 'default' do nginx foi customizado — mantido intacto."
+    fi
 fi
 
 # Instalação anterior usava o nome 'gwos' — dois vhosts do mesmo painel na
