@@ -5,7 +5,10 @@ que ele grava.
 
 ## O que faz
 
-- Pergunta WAN, LAN, rede, IP do gateway, rede secundária e domínio interno
+- Pergunta o nome do servidor (hostname) e acerta o `/etc/hosts` — sem a
+  entrada `127.0.1.1` o `sudo` demora segundos a cada comando
+- Pergunta o perfil da unidade, o domínio, os resolvers e o servidor de hora
+- No modo gateway: WAN, LAN, rede e rede secundária
 - Máquina física: firmware de placas de rede, microcode da CPU, desativa o
   NetworkManager e fixa o nome das interfaces pelo MAC
   (`/etc/systemd/network/70-gwos-*.link`)

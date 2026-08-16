@@ -118,6 +118,11 @@ escrever_conf() {
 # Gerado em $(date '+%Y-%m-%d %H:%M:%S'). Editável, mas prefira 'gwos ip'
 # para trocar o IP do gateway (ele revalida e recarrega tudo).
 
+# ── Identidade da máquina ───────────────────────────────────────────────
+NOME_SERVIDOR=${NOME_SERVIDOR:-$(hostname -s 2>/dev/null || echo servidor)}
+# gateway = roteia entre duas placas; servidor = só serve (DNS, hora, proxy)
+PAPEL=${PAPEL:-servidor}
+
 # ── Interfaces ──────────────────────────────────────────────────────────
 IFACE_WAN=${IFACE_WAN}
 IFACE_LAN=${IFACE_LAN}
@@ -223,6 +228,33 @@ garantir_conf() {
     detectar_rede
     [ "$antes" = "${IFACE_WAN}${IFACE_LAN}${REDE_LAN}${IP_GATEWAY}" ] || escrever_conf
     carregar_conf
+}
+
+# ----------------------------------------------------------------------------
+# Identidade da máquina
+# ----------------------------------------------------------------------------
+# definir_hostname <nome> — troca o hostname e acerta o /etc/hosts.
+# A entrada 127.0.1.1 importa: sem ela o sudo demora vários segundos a cada
+# comando (tenta resolver o próprio nome e espera o timeout do DNS) e alguns
+# serviços recusam subir.
+definir_hostname() {
+    local novo="$1" dominio="${2:-${DOMINIO_LOCAL:-local}}"
+    [ -n "$novo" ] || return 1
+
+    hostnamectl set-hostname "$novo" 2>/dev/null || echo "$novo" > /etc/hostname
+
+    backup_arquivo /etc/hosts
+    if grep -qE '^127\.0\.1\.1[[:space:]]' /etc/hosts 2>/dev/null; then
+        sed -i "s|^127\.0\.1\.1[[:space:]].*|127.0.1.1	${novo}.${dominio} ${novo}|" /etc/hosts
+    else
+        printf '127.0.1.1	%s.%s %s
+' "$novo" "$dominio" "$novo" >> /etc/hosts
+    fi
+    return 0
+}
+
+valida_hostname() {
+    echo "$1" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$'
 }
 
 # ----------------------------------------------------------------------------

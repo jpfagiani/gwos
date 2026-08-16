@@ -30,7 +30,7 @@ ORDEM=(
 )
 
 declare -A DESCRICAO=(
-    [00-base]="Rede do gateway — exige DUAS placas de rede"
+    [00-base]="Nome, IP e domínio desta máquina (gateway ou servidor)"
     [10-banco-mariadb]="Banco de dados (necessário para grupos, domínios, horários)"
     [20-dns-bind9]="Servidor DNS da rede, com bloqueio por domínio"
     [25-dns-interno-dnsmasq]="Nomes internos da LAN (portal, samba...)"
@@ -67,14 +67,14 @@ NUM_IFACES=$(listar_ifaces | grep -c . || true)
 if [ "${NUM_IFACES:-0}" -lt 2 ] && [ "$ESCOLHER" = "0" ] && [ ${#SELECIONADOS[@]} -eq 0 ]; then
     echo ""
     aviso "Esta máquina tem ${NUM_IFACES} interface de rede."
-    echo "  Os módulos de gateway (00-base e 40-firewall-nftables) precisam de duas"
-    echo "  e serão pulados. Os serviços — DNS, hora, proxy, painel — funcionam"
-    echo "  normalmente com uma placa só."
+    echo "  O 00-base roda assim mesmo, em modo SERVIDOR: pergunta nome, IP e"
+    echo "  domínio, sem configurar roteamento."
+    echo "  Só o 40-firewall-nftables é pulado — NAT exige duas placas."
     echo ""
     if confirmar "Escolher quais módulos instalar?"; then
         ESCOLHER=1
     else
-        PULAR=(00-base 40-firewall-nftables)
+        PULAR=(40-firewall-nftables)
     fi
 fi
 
@@ -161,14 +161,19 @@ echo ""
 [ ${#PULADOS[@]}   -gt 0 ] && echo -e "  Pulados     : ${PULADOS[*]}"
 
 carregar_conf
-if [ ${#PULADOS[@]} -gt 0 ] && [[ " ${PULADOS[*]} " == *" 00-base "* ]]; then
-    echo -e "  Endereço    : ${BOLD}${IP_GATEWAY:-?}${NC} em ${BOLD}${IFACE_LAN:-?}${NC} (rede já existente, não alterada)"
-else
+echo -e "  Servidor    : ${BOLD}${NOME_SERVIDOR:-?}.${DOMINIO_LOCAL:-?}${NC} (${PAPEL:-?})"
+if [ "${PAPEL:-servidor}" = "gateway" ]; then
     echo -e "  Interfaces  : WAN ${BOLD}${IFACE_WAN:-?}${NC}  |  LAN ${BOLD}${IFACE_LAN:-?}${NC}"
     echo -e "  Rede LAN    : ${BOLD}${REDE_LAN:-?}${NC}"
+else
+    echo -e "  Endereço    : ${BOLD}${IP_GATEWAY:-?}${NC} em ${BOLD}${IFACE_LAN:-?}${NC}"
 fi
 if [[ " ${INSTALADOS[*]} " == *" 60-painel-web "* ]]; then
-    echo -e "  Painel      : ${BOLD}http://${IP_GATEWAY:-?}${NC}"
+    if [ "${PAINEL_PORTA:-80}" = "80" ]; then
+        echo -e "  Painel      : ${BOLD}http://${IP_GATEWAY:-?}${NC}"
+    else
+        echo -e "  Painel      : ${BOLD}http://${IP_GATEWAY:-?}:${PAINEL_PORTA}${NC}"
+    fi
     echo -e "  Login       : ${BOLD}admin@gwos.local${NC}   Senha: ${BOLD}gwos@2025${NC}"
 fi
 if tem_ssl_bump; then

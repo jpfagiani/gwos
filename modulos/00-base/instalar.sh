@@ -1,18 +1,21 @@
 #!/bin/bash
 # ============================================================================
-# GWOS — Módulo 00-base: rede, hardware e estado compartilhado
+# GWOS — Módulo 00-base: identidade e rede da máquina
 # ============================================================================
-# É o único módulo que mexe em /etc/network/interfaces. Todos os outros só
-# LEEM os parâmetros de rede em /etc/gwos/gwos.conf.
+# É o único módulo que mexe em /etc/hostname e /etc/network/interfaces. Todos
+# os outros só LEEM os parâmetros em /etc/gwos/gwos.conf.
 #
-# Instala/configura:
-#   - firmware de placas de rede e microcode da CPU (só em máquina física)
-#   - fixação do nome das interfaces pelo MAC (só em máquina física)
-#   - /etc/network/interfaces (WAN + LAN + alias da rede secundária)
-#   - /etc/sysctl.d/90-gwos-base.conf (encaminhamento de pacotes)
-#   - /etc/gwos/gwos.conf (estado lido por todos os demais módulos)
+# Dois modos:
 #
-# Opcional: os outros módulos detectam a rede sozinhos se este não for usado.
+#   GATEWAY  (duas placas) — roteia da internet para a rede interna. Configura
+#            WAN, LAN, rede secundária e liga o encaminhamento de pacotes.
+#
+#   SERVIDOR (uma placa)   — só serve (DNS, hora, proxy, painel). Configura
+#            nome, IP e domínio; não roteia nada.
+#
+# Antes este módulo simplesmente recusava máquinas de uma placa, e com isso
+# ninguém perguntava nome nem IP num servidor de DNS. Não é a mesma coisa
+# "não ser gateway" e "não precisar de configuração de rede".
 # ============================================================================
 
 set -euo pipefail
@@ -27,44 +30,20 @@ done
     exit 1; }
 
 exigir_root
-titulo "══ Módulo 00-base — rede e preparação da máquina ══"
+titulo "══ Módulo 00-base — identidade e rede da máquina ══"
 instalar_ferramentas_comuns
+carregar_conf
 
 instalar_pacotes ifupdown iproute2 sudo curl ca-certificates
 
 # ===========================================================================
-# 1. Interfaces de rede
+# 1. Interfaces disponíveis
 # ===========================================================================
 titulo "── Interfaces de rede ──"
 echo ""
 
 mapfile -t IFACES < <(listar_ifaces)
 [ ${#IFACES[@]} -gt 0 ] || erro "Nenhuma interface de rede encontrada."
-
-# ---------------------------------------------------------------------------
-# Uma placa só: esta máquina não pode ser gateway, e o 00-base não se aplica.
-# Sai com código 2 — o instalar-todos entende como "não aplicável", não falha.
-# ---------------------------------------------------------------------------
-if [ ${#IFACES[@]} -lt 2 ]; then
-    echo ""
-    aviso "Esta máquina tem uma única interface de rede (${IFACES[0]})."
-    echo ""
-    echo "  O módulo 00-base configura o roteamento entre a internet (WAN) e a"
-    echo "  rede interna (LAN). Isso exige duas placas — é o módulo de gateway."
-    echo ""
-    echo -e "  ${BOLD}Se este servidor é só DNS, hora, proxy ou painel, você não precisa dele.${NC}"
-    echo "  Os demais módulos detectam a rede sozinhos e não encostam no"
-    echo "  /etc/network/interfaces:"
-    echo ""
-    echo -e "    ${BOLD}bash ${GWOS_MODULOS_DIR}/20-dns-bind9/instalar.sh${NC}"
-    echo -e "    ${BOLD}bash ${GWOS_MODULOS_DIR}/30-hora-chrony/instalar.sh${NC}"
-    echo ""
-    echo "  Se a segunda placa existe mas não apareceu, verifique o firmware"
-    echo "  (ip -br link) e reexecute este módulo."
-    echo ""
-    info "Módulo 00-base não se aplica — nada foi alterado."
-    exit 2
-fi
 
 printf "  %-4s %-14s %-22s %-8s %s\n" "Nº" "Interface" "IP/Máscara" "Status" "Velocidade"
 echo "  ──────────────────────────────────────────────────────────────"
@@ -109,88 +88,32 @@ selecionar_iface() {
     echo "$RESULTADO"
 }
 
-titulo "── Interface WAN (saída para a Internet) ──"
-echo ""
-WAN_AUTO=$(ip route show default 2>/dev/null | awk '/default/{print $5}' | head -1 || true)
-IFACE_WAN=$(selecionar_iface "Interface WAN" "$WAN_AUTO")
-ok "WAN: $IFACE_WAN"
-
-titulo "── Interface LAN (rede interna) ──"
-echo ""
-LAN_AUTO=""
-for iface in "${IFACES[@]}"; do
-    [ "$iface" != "$IFACE_WAN" ] && { LAN_AUTO="$iface"; break; }
-done
-IFACE_LAN=$(selecionar_iface "Interface LAN" "$LAN_AUTO")
-if [ "$IFACE_LAN" = "$IFACE_WAN" ]; then
-    echo ""
-    aviso "WAN e LAN não podem ser a mesma interface — um gateway roteia de uma"
-    aviso "placa para a outra."
-    echo "  Interfaces disponíveis: ${IFACES[*]}"
-    echo "  Se esta máquina não é gateway, pule o 00-base e instale só os"
-    echo "  serviços que você precisa (DNS, hora, proxy, painel)."
-    exit 1
-fi
-ok "LAN: $IFACE_LAN"
-
 # ===========================================================================
-# 2. Rede interna
+# 2. Papel desta máquina
 # ===========================================================================
-titulo "── Rede LAN ──"
+titulo "── Papel desta máquina ──"
 echo ""
 
-IP_LAN_CIDR=$(ip -4 addr show "$IFACE_LAN" 2>/dev/null | awk '/inet /{print $2}' | head -1 || true)
-if [ -n "$IP_LAN_CIDR" ]; then
-    IP_GW_SUGERIDO=$(echo "$IP_LAN_CIDR" | cut -d/ -f1)
-    REDE_SUGERIDA=$(rede_de_ip "$IP_GW_SUGERIDO" "$(echo "$IP_LAN_CIDR" | cut -d/ -f2)")
+if [ ${#IFACES[@]} -lt 2 ]; then
+    PAPEL="servidor"
+    aviso "Uma única interface (${IFACES[0]}) — esta máquina não pode ser gateway."
+    echo  "      Um gateway roteia de uma placa para a outra."
+    echo  "      Modo SERVIDOR: nome, IP e domínio; sem roteamento."
 else
-    REDE_SUGERIDA="192.168.1.0/24"
-    IP_GW_SUGERIDO="192.168.1.1"
+    echo "  ${BOLD}gateway${NC}  — roteia a internet para a rede interna (2 placas)"
+    echo -e "  ${BOLD}servidor${NC} — só serve DNS, hora, proxy ou painel"
+    echo ""
+    if confirmar "Esta máquina é o gateway da rede?"; then
+        PAPEL="gateway"
+    else
+        PAPEL="servidor"
+    fi
 fi
+ok "Papel: ${PAPEL}"
 
-echo -e "  Sugestão de rede LAN : ${BOLD}${REDE_SUGERIDA}${NC}"
-echo -e "  Sugestão de IP       : ${BOLD}${IP_GW_SUGERIDO}${NC}"
-echo -e "  ${YELLOW}(Enter aceita a sugestão)${NC}"
-echo ""
-
-perguntar REDE_LAN "Rede LAN em CIDR" "$REDE_SUGERIDA"
-while ! valida_cidr "$REDE_LAN"; do
-    echo -e "  ${RED}Rede inválida: '${REDE_LAN}' — use CIDR (ex: 192.168.1.0/24)${NC}"
-    perguntar REDE_LAN "Rede LAN em CIDR" "$REDE_SUGERIDA"
-done
-
-perguntar IP_GATEWAY "IP deste gateway na LAN" "$IP_GW_SUGERIDO"
-while ! valida_ip "$IP_GATEWAY"; do
-    echo -e "  ${RED}IP inválido: '${IP_GATEWAY}' — use IPv4 (ex: 192.168.1.1)${NC}"
-    perguntar IP_GATEWAY "IP deste gateway na LAN" "$IP_GW_SUGERIDO"
-done
-ok "Rede: $REDE_LAN  |  Gateway: $IP_GATEWAY"
-
-# --- Rede secundária (alias) -----------------------------------------------
-titulo "── Rede Secundária / Alias (opcional) ──"
-echo ""
-echo -e "  IP secundário na LAN para rotear entre duas sub-redes."
-echo -e "  Exemplo: GWOS em 172.14.29.10 + alias 10.14.29.254 para a rede 10.x"
-echo ""
-
-REDE2_ATIVO=0; IP_ALIAS=""; REDE2_MASK="255.255.255.0"; REDE2_CIDR=""; REDE2_PREFIX=24
-if confirmar "Configurar rede secundária?"; then
-    REDE2_ATIVO=1
-    perguntar IP_ALIAS "IP do alias na rede secundária (ex: 10.14.29.254)" ""
-    while ! valida_ip "$IP_ALIAS"; do
-        echo -e "  ${RED}IP inválido.${NC}"
-        perguntar IP_ALIAS "IP do alias" ""
-    done
-    perguntar REDE2_MASK "Máscara da rede secundária" "255.255.255.0"
-    REDE2_PREFIX=$(prefixo_de_mascara "$REDE2_MASK")
-    REDE2_CIDR=$(rede_de_ip "$IP_ALIAS" "$REDE2_PREFIX")
-    ok "Alias: ${IFACE_LAN}:1  IP: ${IP_ALIAS}  Rede: ${REDE2_CIDR}"
-fi
-
-# --- Perfil da unidade ------------------------------------------------------
-# DNS interno, servidor de hora e domínios da intranet mudam de uma unidade
-# para outra. Ficam em modulos/perfis/<unidade>.conf, para o mesmo repositório
-# servir a qualquer unidade sem editar script.
+# ===========================================================================
+# 3. Perfil da unidade
+# ===========================================================================
 titulo "── Perfil da unidade ──"
 echo ""
 
@@ -199,18 +122,17 @@ if [ ${#PERFIS[@]} -gt 0 ]; then
     echo "  Perfis disponíveis:"
     IDX=1
     for perfil in "${PERFIS[@]}"; do
-        printf "    %d) %s
-" "$IDX" "$perfil"
+        printf "    %d) %s\n" "$IDX" "$perfil"
         IDX=$((IDX + 1))
     done
-    printf "    %d) %s
-" "$IDX" "nenhum — perguntar tudo"
+    printf "    %d) %s\n" "$IDX" "nenhum — perguntar tudo"
     echo ""
     perguntar ESCOLHA "Perfil" "1"
 
     if [[ "$ESCOLHA" =~ ^[0-9]+$ ]] && [ "$ESCOLHA" -ge 1 ] && [ "$ESCOLHA" -le ${#PERFIS[@]} ]; then
         PERFIL="${PERFIS[$((ESCOLHA - 1))]}"
-        carregar_perfil "$PERFIL" && ok "Perfil '${PERFIL}' carregado."             || aviso "Não foi possível ler o perfil '${PERFIL}'."
+        carregar_perfil "$PERFIL" && ok "Perfil '${PERFIL}' carregado." \
+            || aviso "Não foi possível ler o perfil '${PERFIL}'."
     else
         info "Sem perfil — os valores serão perguntados."
     fi
@@ -218,16 +140,180 @@ else
     aviso "Nenhum perfil em modulos/perfis/ — os valores serão perguntados."
 fi
 
-# --- Domínio, DNS e hora ----------------------------------------------------
-# O perfil preenche os padrões; o que ele não trouxer, é perguntado aqui.
-titulo "── Nomes, DNS e hora ──"
+# ===========================================================================
+# 4. Nome do servidor e domínio
+# ===========================================================================
+titulo "── Identidade ──"
 echo ""
-perguntar DOMINIO_LOCAL "Domínio dos nomes da LAN" "${DOMINIO_LOCAL:-local}"
 
+perguntar NOME_SERVIDOR "Nome deste servidor (hostname)" \
+          "${NOME_SERVIDOR:-$(hostname -s 2>/dev/null || echo servidor)}"
+while ! valida_hostname "$NOME_SERVIDOR"; do
+    aviso "Nome inválido: '${NOME_SERVIDOR}' — só letras, números e hífen."
+    perguntar NOME_SERVIDOR "Nome deste servidor" "$(hostname -s 2>/dev/null || echo servidor)"
+done
+
+perguntar DOMINIO_LOCAL "Domínio dos nomes da LAN" "${DOMINIO_LOCAL:-local}"
+ok "Este servidor será ${NOME_SERVIDOR}.${DOMINIO_LOCAL}"
+
+# ===========================================================================
+# 5. Rede
+# ===========================================================================
+if [ "$PAPEL" = "gateway" ]; then
+    # ─── Modo gateway: WAN + LAN ───────────────────────────────────────────
+    titulo "── Interface WAN (saída para a Internet) ──"
+    echo ""
+    WAN_AUTO=$(ip route show default 2>/dev/null | awk '/default/{print $5}' | head -1 || true)
+    IFACE_WAN=$(selecionar_iface "Interface WAN" "$WAN_AUTO")
+    ok "WAN: $IFACE_WAN"
+
+    titulo "── Interface LAN (rede interna) ──"
+    echo ""
+    LAN_AUTO=""
+    for iface in "${IFACES[@]}"; do
+        [ "$iface" != "$IFACE_WAN" ] && { LAN_AUTO="$iface"; break; }
+    done
+    IFACE_LAN=$(selecionar_iface "Interface LAN" "$LAN_AUTO")
+    if [ "$IFACE_LAN" = "$IFACE_WAN" ]; then
+        echo ""
+        aviso "WAN e LAN não podem ser a mesma interface — um gateway roteia de"
+        aviso "uma placa para a outra."
+        echo "  Interfaces disponíveis: ${IFACES[*]}"
+        exit 1
+    fi
+    ok "LAN: $IFACE_LAN"
+
+    titulo "── Rede interna ──"
+    echo ""
+    IP_LAN_CIDR=$(ip -4 addr show "$IFACE_LAN" 2>/dev/null | awk '/inet /{print $2}' | head -1 || true)
+    if [ -n "$IP_LAN_CIDR" ]; then
+        IP_SUGERIDO=$(echo "$IP_LAN_CIDR" | cut -d/ -f1)
+        REDE_SUGERIDA=$(rede_de_ip "$IP_SUGERIDO" "$(echo "$IP_LAN_CIDR" | cut -d/ -f2)")
+    else
+        REDE_SUGERIDA="192.168.1.0/24"; IP_SUGERIDO="192.168.1.1"
+    fi
+
+    perguntar REDE_LAN "Rede interna em CIDR" "$REDE_SUGERIDA"
+    while ! valida_cidr "$REDE_LAN"; do
+        aviso "Rede inválida: '${REDE_LAN}' — use CIDR (ex: 192.168.1.0/24)"
+        perguntar REDE_LAN "Rede interna em CIDR" "$REDE_SUGERIDA"
+    done
+
+    perguntar IP_GATEWAY "IP deste gateway na rede interna" "$IP_SUGERIDO"
+    while ! valida_ip "$IP_GATEWAY"; do
+        aviso "IP inválido: '${IP_GATEWAY}'"
+        perguntar IP_GATEWAY "IP deste gateway na rede interna" "$IP_SUGERIDO"
+    done
+    ok "Rede: $REDE_LAN  |  IP: $IP_GATEWAY"
+
+    # Rede secundária
+    titulo "── Rede secundária / alias (opcional) ──"
+    echo ""
+    echo "  IP secundário na LAN para rotear entre duas sub-redes."
+    echo "  Exemplo: GWOS em 172.14.29.10 + alias 10.14.29.254 para a rede 10.x"
+    echo ""
+    REDE2_ATIVO=0; IP_ALIAS=""; REDE2_MASK="255.255.255.0"; REDE2_CIDR=""; REDE2_PREFIX=24
+    if confirmar "Configurar rede secundária?"; then
+        REDE2_ATIVO=1
+        perguntar IP_ALIAS "IP do alias (ex: 10.14.29.254)" ""
+        while ! valida_ip "$IP_ALIAS"; do
+            aviso "IP inválido."
+            perguntar IP_ALIAS "IP do alias" ""
+        done
+        perguntar REDE2_MASK "Máscara da rede secundária" "255.255.255.0"
+        REDE2_PREFIX=$(prefixo_de_mascara "$REDE2_MASK")
+        REDE2_CIDR=$(rede_de_ip "$IP_ALIAS" "$REDE2_PREFIX")
+        ok "Alias: ${IFACE_LAN}:1  IP: ${IP_ALIAS}  Rede: ${REDE2_CIDR}"
+    fi
+
+    # WAN
+    titulo "── Saída para a Internet (WAN) ──"
+    echo ""
+    WAN_IP_ATUAL=$(ip -4 addr show "$IFACE_WAN" 2>/dev/null | awk '/inet /{print $2}' | head -1 || true)
+    WAN_GW_ATUAL=$(ip route show default 2>/dev/null | awk '/default/{print $3}' | head -1 || true)
+    echo -e "  IP atual da WAN  : ${BOLD}${WAN_IP_ATUAL:-sem IP}${NC}"
+    echo -e "  Gateway WAN atual: ${BOLD}${WAN_GW_ATUAL:-não detectado}${NC}"
+    echo ""
+    perguntar WAN_DHCP "WAN usa DHCP? (S/n)" "S"
+    if [[ "$WAN_DHCP" =~ ^[Ss]$ ]]; then
+        WAN_MODO="dhcp"; WAN_IP=""; WAN_MASK=""; WAN_GW=""; WAN_DNS=""
+        ok "WAN: DHCP"
+    else
+        WAN_MODO="static"
+        WAN_PREF=$(echo "$WAN_IP_ATUAL" | cut -d/ -f2)
+        perguntar WAN_IP   "IP estático WAN" "$(echo "$WAN_IP_ATUAL" | cut -d/ -f1)"
+        perguntar WAN_MASK "Máscara de rede" "$(mascara_de_prefixo "${WAN_PREF:-24}")"
+        perguntar WAN_GW   "Gateway padrão"  "$WAN_GW_ATUAL"
+        WAN_PREF=$(prefixo_de_mascara "$WAN_MASK")
+        ok "WAN: $WAN_IP / $WAN_MASK via $WAN_GW"
+    fi
+
+else
+    # ─── Modo servidor: uma interface ──────────────────────────────────────
+    titulo "── Interface de rede ──"
+    echo ""
+    if [ ${#IFACES[@]} -eq 1 ]; then
+        IFACE_LAN="${IFACES[0]}"
+        ok "Interface: $IFACE_LAN"
+    else
+        IFACE_LAN=$(selecionar_iface "Interface deste servidor" "${IFACES[0]}")
+    fi
+    IFACE_WAN="$IFACE_LAN"   # servidor não roteia: a mesma placa para tudo
+
+    titulo "── Endereço deste servidor ──"
+    echo ""
+    IP_ATUAL_CIDR=$(ip -4 addr show "$IFACE_LAN" 2>/dev/null | awk '/inet /{print $2}' | head -1 || true)
+    GW_ATUAL=$(ip route show default 2>/dev/null | awk '/default/{print $3}' | head -1 || true)
+    echo -e "  IP atual      : ${BOLD}${IP_ATUAL_CIDR:-sem IP}${NC}"
+    echo -e "  Gateway atual : ${BOLD}${GW_ATUAL:-não detectado}${NC}"
+    echo ""
+    echo "  1) Manter como está (não mexer na configuração de rede)"
+    echo "  2) IP fixo"
+    echo "  3) DHCP"
+    echo ""
+    perguntar MODO_IP "Endereçamento" "1"
+
+    case "$MODO_IP" in
+        2)
+            SRV_MODO="static"
+            IP_SUGERIDO=$(echo "$IP_ATUAL_CIDR" | cut -d/ -f1)
+            PREF_ATUAL=$(echo "$IP_ATUAL_CIDR" | cut -d/ -f2)
+            perguntar IP_GATEWAY "IP deste servidor" "${IP_SUGERIDO:-192.168.1.10}"
+            while ! valida_ip "$IP_GATEWAY"; do
+                aviso "IP inválido: '${IP_GATEWAY}'"
+                perguntar IP_GATEWAY "IP deste servidor" "${IP_SUGERIDO:-192.168.1.10}"
+            done
+            perguntar SRV_MASK "Máscara de rede" "$(mascara_de_prefixo "${PREF_ATUAL:-24}")"
+            SRV_PREF=$(prefixo_de_mascara "$SRV_MASK")
+            perguntar SRV_GW "Gateway da rede" "${GW_ATUAL:-}"
+            REDE_LAN=$(rede_de_ip "$IP_GATEWAY" "$SRV_PREF")
+            ok "IP fixo: ${IP_GATEWAY}/${SRV_PREF}  rede ${REDE_LAN}  via ${SRV_GW:-sem gateway}"
+            ;;
+        3)
+            SRV_MODO="dhcp"
+            IP_GATEWAY=$(echo "$IP_ATUAL_CIDR" | cut -d/ -f1)
+            REDE_LAN=$(rede_de_ip "${IP_GATEWAY:-192.168.1.10}" "$(echo "${IP_ATUAL_CIDR:-/24}" | cut -d/ -f2)")
+            ok "DHCP — o IP pode mudar; os nomes internos apontam para o IP atual."
+            ;;
+        *)
+            SRV_MODO="manter"
+            IP_GATEWAY=$(echo "$IP_ATUAL_CIDR" | cut -d/ -f1)
+            REDE_LAN=$(rede_de_ip "${IP_GATEWAY:-192.168.1.10}" "$(echo "${IP_ATUAL_CIDR:-x/24}" | cut -d/ -f2)")
+            [ -n "$IP_GATEWAY" ] || erro "A interface não tem IP — escolha 2 (IP fixo) ou 3 (DHCP)."
+            ok "Rede mantida: ${IP_GATEWAY} na rede ${REDE_LAN}"
+            ;;
+    esac
+    REDE2_ATIVO=0; IP_ALIAS=""; REDE2_CIDR=""; REDE2_MASK="255.255.255.0"
+fi
+
+# ===========================================================================
+# 6. DNS e hora
+# ===========================================================================
+titulo "── DNS e hora ──"
 echo ""
 echo "  Resolvers para onde vai tudo que não é domínio interno."
-echo "  Se a unidade tem DNS próprio, ponha-o primeiro."
-perguntar DNS_FORWARDERS "Resolvers (separados por espaço)"           "${DNS_FORWARDERS:-8.8.8.8 8.8.4.4 1.1.1.1}"
+perguntar DNS_FORWARDERS "Resolvers (separados por espaço)" \
+          "${DNS_FORWARDERS:-8.8.8.8 8.8.4.4 1.1.1.1}"
 
 echo ""
 echo "  Domínios com DNS próprio, no formato dominio:ip — separados por espaço."
@@ -239,52 +325,41 @@ echo "  Servidor de hora da rede (vazio = só o pool público)."
 perguntar NTP_SERVIDORES "Servidor NTP" "${NTP_SERVIDORES:-}"
 perguntar NTP_POOL       "Pool de reserva" "${NTP_POOL:-pool.ntp.br}"
 
-# --- WAN --------------------------------------------------------------------
-titulo "── Configuração da WAN ──"
-echo ""
-WAN_IP_ATUAL=$(ip -4 addr show "$IFACE_WAN" 2>/dev/null | awk '/inet /{print $2}' | head -1 || true)
-WAN_GW_ATUAL=$(ip route show default 2>/dev/null | awk '/default/{print $3}' | head -1 || true)
-echo -e "  IP atual da WAN  : ${BOLD}${WAN_IP_ATUAL:-sem IP}${NC}"
-echo -e "  Gateway WAN atual: ${BOLD}${WAN_GW_ATUAL:-não detectado}${NC}"
-echo ""
-
-perguntar WAN_DHCP "WAN usa DHCP? (S/n)" "S"
-if [[ "$WAN_DHCP" =~ ^[Ss]$ ]]; then
-    WAN_MODO="dhcp"; WAN_IP=""; WAN_MASK=""; WAN_GW=""; WAN_DNS=""
-    ok "WAN: DHCP"
-else
-    WAN_MODO="static"
-    WAN_IP_DEF=$(echo "$WAN_IP_ATUAL" | cut -d/ -f1)
-    WAN_PREF=$(echo "$WAN_IP_ATUAL" | cut -d/ -f2)
-    perguntar WAN_IP   "IP estático WAN" "$WAN_IP_DEF"
-    perguntar WAN_MASK "Máscara de rede" "$(mascara_de_prefixo "${WAN_PREF:-24}")"
-    perguntar WAN_GW   "Gateway padrão"  "$WAN_GW_ATUAL"
-    perguntar WAN_DNS  "DNS primário"    "8.8.8.8"
-    WAN_PREF=$(prefixo_de_mascara "$WAN_MASK")
-    ok "WAN: IP=$WAN_IP  Máscara=$WAN_MASK  GW=$WAN_GW  DNS=$WAN_DNS"
-fi
-
-LAN_PREF=$(echo "$REDE_LAN" | cut -d/ -f2)
-LAN_MASK=$(mascara_de_prefixo "$LAN_PREF")
-
-# --- Resumo -----------------------------------------------------------------
+# ===========================================================================
+# 7. Resumo
+# ===========================================================================
 titulo "── Resumo ──"
 echo ""
-echo -e "  WAN            : ${BOLD}${IFACE_WAN}${NC} (${WAN_MODO})"
-echo -e "  LAN            : ${BOLD}${IFACE_LAN}${NC}"
-echo -e "  Rede LAN       : ${BOLD}${REDE_LAN}${NC}"
-echo -e "  IP Gateway     : ${BOLD}${IP_GATEWAY}${NC}"
-echo -e "  Domínio interno: ${BOLD}${DOMINIO_LOCAL}${NC}"
+echo -e "  Papel          : ${BOLD}${PAPEL}${NC}"
+echo -e "  Servidor       : ${BOLD}${NOME_SERVIDOR}.${DOMINIO_LOCAL}${NC}"
+if [ "$PAPEL" = "gateway" ]; then
+    echo -e "  WAN            : ${BOLD}${IFACE_WAN}${NC} (${WAN_MODO})"
+    echo -e "  LAN            : ${BOLD}${IFACE_LAN}${NC}"
+    echo -e "  Rede interna   : ${BOLD}${REDE_LAN}${NC}"
+    echo -e "  IP do gateway  : ${BOLD}${IP_GATEWAY}${NC}"
+    [ "$REDE2_ATIVO" = "1" ] && \
+        echo -e "  Rede 2         : ${BOLD}${REDE2_CIDR}  (${IFACE_LAN}:1 → ${IP_ALIAS})${NC}"
+else
+    echo -e "  Interface      : ${BOLD}${IFACE_LAN}${NC} (${SRV_MODO})"
+    echo -e "  IP             : ${BOLD}${IP_GATEWAY}${NC}"
+    echo -e "  Rede           : ${BOLD}${REDE_LAN}${NC}"
+fi
 echo -e "  Resolvers      : ${BOLD}${DNS_FORWARDERS}${NC}"
-[ -n "${ZONAS_INTERNAS:-}" ] && echo -e "  Domínios internos: ${BOLD}${ZONAS_INTERNAS}${NC}"
+[ -n "${ZONAS_INTERNAS:-}" ] && echo -e "  Dom. internos  : ${BOLD}${ZONAS_INTERNAS}${NC}"
 echo -e "  Hora           : ${BOLD}${NTP_SERVIDORES:-(só pool)} + ${NTP_POOL}${NC}"
-[ "$REDE2_ATIVO" = "1" ] && \
-    echo -e "  Rede 2         : ${BOLD}${REDE2_CIDR}  alias ${IFACE_LAN}:1 → ${IP_ALIAS}${NC}"
 echo ""
-confirmar "Aplicar esta configuração de rede?" || { echo "Cancelado."; exit 0; }
+confirmar "Aplicar esta configuração?" || { echo "Cancelado."; exit 0; }
 
 # ===========================================================================
-# 3. Preparação do hardware (só em máquina física)
+# 8. Hostname
+# ===========================================================================
+titulo "══ Identidade ══"
+definir_hostname "$NOME_SERVIDOR" "$DOMINIO_LOCAL" \
+    && ok "Hostname: ${NOME_SERVIDOR}.${DOMINIO_LOCAL} (e /etc/hosts ajustado)" \
+    || aviso "Não foi possível definir o hostname."
+
+# ===========================================================================
+# 9. Preparação do hardware (só em máquina física)
 # ===========================================================================
 titulo "══ Preparação do hardware ══"
 
@@ -329,68 +404,81 @@ else
 fi
 
 # ===========================================================================
-# 4. /etc/network/interfaces
+# 10. /etc/network/interfaces
 # ===========================================================================
-titulo "══ Configuração de rede ══"
-
-backup_arquivo /etc/network/interfaces
-
-cat > /etc/network/interfaces <<NETEOF
-# /etc/network/interfaces — gerado pelo módulo 00-base do GWOS
-# em $(date '+%Y-%m-%d %H:%M:%S').
-# Para trocar o IP do gateway use 'gwos ip', nunca edite à mão.
-
-source /etc/network/interfaces.d/*
-
-auto lo
-iface lo inet loopback
-
-# WAN — saída para a internet
-auto ${IFACE_WAN}
-NETEOF
-
-if [ "$WAN_MODO" = "dhcp" ]; then
-    printf 'iface %s inet dhcp\n\n' "$IFACE_WAN" >> /etc/network/interfaces
+if [ "$PAPEL" = "servidor" ] && [ "$SRV_MODO" = "manter" ]; then
+    info "Configuração de rede mantida como está — nada alterado."
 else
-    cat >> /etc/network/interfaces <<NETEOF
-iface ${IFACE_WAN} inet static
-    address ${WAN_IP}
-    netmask ${WAN_MASK}
-    gateway ${WAN_GW}
-    dns-nameservers ${WAN_DNS}
+    titulo "══ Configuração de rede ══"
+    backup_arquivo /etc/network/interfaces
 
-NETEOF
-fi
+    {
+        echo "# /etc/network/interfaces — gerado pelo módulo 00-base do GWOS"
+        echo "# em $(date '+%Y-%m-%d %H:%M:%S'), modo ${PAPEL}."
+        echo "# Para trocar o IP use 'gwos ip', nunca edite à mão."
+        echo ""
+        echo "source /etc/network/interfaces.d/*"
+        echo ""
+        echo "auto lo"
+        echo "iface lo inet loopback"
+        echo ""
+    } > /etc/network/interfaces
 
-cat >> /etc/network/interfaces <<NETEOF
-# LAN — rede interna (IP fixo — este servidor é o gateway)
-auto ${IFACE_LAN}
-iface ${IFACE_LAN} inet static
-    address ${IP_GATEWAY}
-    netmask ${LAN_MASK}
+    if [ "$PAPEL" = "gateway" ]; then
+        {
+            echo "# WAN — saída para a internet"
+            echo "auto ${IFACE_WAN}"
+            if [ "$WAN_MODO" = "dhcp" ]; then
+                echo "iface ${IFACE_WAN} inet dhcp"
+            else
+                echo "iface ${IFACE_WAN} inet static"
+                echo "    address ${WAN_IP}"
+                echo "    netmask ${WAN_MASK}"
+                echo "    gateway ${WAN_GW}"
+            fi
+            echo ""
+            echo "# LAN — rede interna (IP fixo — este servidor é o gateway)"
+            echo "auto ${IFACE_LAN}"
+            echo "iface ${IFACE_LAN} inet static"
+            echo "    address ${IP_GATEWAY}"
+            echo "    netmask $(mascara_de_prefixo "$(echo "$REDE_LAN" | cut -d/ -f2)")"
+            echo ""
+        } >> /etc/network/interfaces
 
-NETEOF
+        if [ "$REDE2_ATIVO" = "1" ]; then
+            {
+                echo "# Alias secundário — roteamento para a rede ${REDE2_CIDR}"
+                echo "auto ${IFACE_LAN}:1"
+                echo "iface ${IFACE_LAN}:1 inet static"
+                echo "    address ${IP_ALIAS}"
+                echo "    netmask ${REDE2_MASK}"
+                echo ""
+            } >> /etc/network/interfaces
+        fi
+    else
+        {
+            echo "# Interface única — este servidor não roteia"
+            echo "auto ${IFACE_LAN}"
+            if [ "$SRV_MODO" = "dhcp" ]; then
+                echo "iface ${IFACE_LAN} inet dhcp"
+            else
+                echo "iface ${IFACE_LAN} inet static"
+                echo "    address ${IP_GATEWAY}"
+                echo "    netmask ${SRV_MASK}"
+                [ -n "${SRV_GW:-}" ] && echo "    gateway ${SRV_GW}"
+            fi
+            echo ""
+        } >> /etc/network/interfaces
+    fi
+    ok "/etc/network/interfaces gerado."
 
-if [ "$REDE2_ATIVO" = "1" ]; then
-    cat >> /etc/network/interfaces <<NETEOF
-# Alias secundário — roteamento para a rede ${REDE2_CIDR}
-auto ${IFACE_LAN}:1
-iface ${IFACE_LAN}:1 inet static
-    address ${IP_ALIAS}
-    netmask ${REDE2_MASK}
-
-NETEOF
-fi
-
-ok "/etc/network/interfaces gerado."
-
-# Fixa o nome das interfaces pelo MAC (só em máquina real)
-if [ "$VIRT" = "none" ]; then
-    mkdir -p /etc/systemd/network
-    for IFPIN in "$IFACE_WAN" "$IFACE_LAN"; do
-        MACPIN=$(cat "/sys/class/net/${IFPIN}/address" 2>/dev/null || true)
-        if [ -n "$MACPIN" ] && [ "$MACPIN" != "00:00:00:00:00:00" ]; then
-            cat > "/etc/systemd/network/70-gwos-${IFPIN}.link" <<LINKEOF
+    # Fixa o nome das interfaces pelo MAC (só em máquina real)
+    if [ "$VIRT" = "none" ]; then
+        mkdir -p /etc/systemd/network
+        for IFPIN in $(printf '%s\n%s\n' "$IFACE_WAN" "$IFACE_LAN" | sort -u); do
+            MACPIN=$(cat "/sys/class/net/${IFPIN}/address" 2>/dev/null || true)
+            if [ -n "$MACPIN" ] && [ "$MACPIN" != "00:00:00:00:00:00" ]; then
+                cat > "/etc/systemd/network/70-gwos-${IFPIN}.link" <<LINKEOF
 # Gerado pelo GWOS — mantém o nome '${IFPIN}' amarrado a esta placa física.
 # Se trocar a placa de rede, apague este arquivo e reexecute o módulo 00-base.
 [Match]
@@ -399,42 +487,58 @@ MACAddress=${MACPIN}
 [Link]
 Name=${IFPIN}
 LINKEOF
-            ok "Nome '${IFPIN}' fixado ao MAC ${MACPIN}."
+                ok "Nome '${IFPIN}' fixado ao MAC ${MACPIN}."
+            fi
+        done
+        update-initramfs -u -k all >/dev/null 2>&1 || true
+    fi
+
+    # Aplica sem reiniciar o serviço de rede (não derruba a sessão SSH)
+    if [ "$PAPEL" = "gateway" ]; then
+        LAN_PREF=$(echo "$REDE_LAN" | cut -d/ -f2)
+        ip addr flush dev "$IFACE_LAN" 2>/dev/null || true
+        ip addr add "${IP_GATEWAY}/${LAN_PREF}" dev "$IFACE_LAN" 2>/dev/null || true
+        ip link set "$IFACE_LAN" up 2>/dev/null || true
+        if [ "$REDE2_ATIVO" = "1" ]; then
+            ip addr add "${IP_ALIAS}/${REDE2_PREFIX}" dev "$IFACE_LAN" 2>/dev/null || true
         fi
-    done
-    update-initramfs -u -k all >/dev/null 2>&1 || true
+        if [ "$WAN_MODO" = "static" ]; then
+            ip addr flush dev "$IFACE_WAN" 2>/dev/null || true
+            ip addr add "${WAN_IP}/${WAN_PREF:-24}" dev "$IFACE_WAN" 2>/dev/null || true
+            ip link set "$IFACE_WAN" up 2>/dev/null || true
+            ip route replace default via "$WAN_GW" dev "$IFACE_WAN" 2>/dev/null || true
+        fi
+    elif [ "$SRV_MODO" = "static" ]; then
+        # Adiciona o novo antes de remover o antigo — a sessão SSH não cai
+        ip addr add "${IP_GATEWAY}/${SRV_PREF}" dev "$IFACE_LAN" 2>/dev/null || true
+        ip link set "$IFACE_LAN" up 2>/dev/null || true
+        [ -n "${SRV_GW:-}" ] && ip route replace default via "$SRV_GW" dev "$IFACE_LAN" 2>/dev/null || true
+        aviso "O IP anterior continua ativo até o próximo reboot — assim a sessão não cai."
+    fi
+    ok "Configuração de rede aplicada."
 fi
 
-# Aplica sem reiniciar o serviço de rede (não derruba a sessão SSH)
-ip addr flush dev "$IFACE_LAN" 2>/dev/null || true
-ip addr add "${IP_GATEWAY}/${LAN_PREF}" dev "$IFACE_LAN" 2>/dev/null || true
-ip link set "$IFACE_LAN" up 2>/dev/null || true
-[ "$REDE2_ATIVO" = "1" ] && \
-    ip addr add "${IP_ALIAS}/${REDE2_PREFIX}" dev "$IFACE_LAN" 2>/dev/null || true
-
-if [ "$WAN_MODO" = "static" ]; then
-    ip addr flush dev "$IFACE_WAN" 2>/dev/null || true
-    ip addr add "${WAN_IP}/${WAN_PREF:-24}" dev "$IFACE_WAN" 2>/dev/null || true
-    ip link set "$IFACE_WAN" up 2>/dev/null || true
-    ip route replace default via "$WAN_GW" dev "$IFACE_WAN" 2>/dev/null || true
-fi
-ok "Configuração de rede aplicada."
-
 # ===========================================================================
-# 5. Encaminhamento de pacotes
+# 11. Encaminhamento de pacotes — só no gateway
 # ===========================================================================
-cat > /etc/sysctl.d/90-gwos-base.conf <<SYSCTL
+if [ "$PAPEL" = "gateway" ]; then
+    cat > /etc/sysctl.d/90-gwos-base.conf <<SYSCTL
 # GWOS — parâmetros de kernel do gateway (módulo 00-base)
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 net.ipv4.tcp_syncookies = 1
 SYSCTL
-sysctl -p /etc/sysctl.d/90-gwos-base.conf >/dev/null
-ok "Encaminhamento de pacotes ativado."
+    sysctl -p /etc/sysctl.d/90-gwos-base.conf >/dev/null
+    ok "Encaminhamento de pacotes ativado."
+else
+    # Um servidor que roteia sem querer confunde diagnóstico de rede.
+    rm -f /etc/sysctl.d/90-gwos-base.conf
+    info "Modo servidor — encaminhamento de pacotes não é habilitado."
+fi
 
 # ===========================================================================
-# 6. Estado compartilhado
+# 12. Estado compartilhado
 # ===========================================================================
 escrever_conf
 ok "Estado gravado em ${GWOS_CONF}."
@@ -443,7 +547,12 @@ registrar_modulo base
 integrar
 
 echo ""
-ok "Módulo 00-base instalado."
-echo -e "  Próximos módulos: ${BOLD}10-banco-mariadb${NC}, ${BOLD}20-dns-bind9${NC}, ${BOLD}25-dns-interno-dnsmasq${NC},"
-echo -e "                    ${BOLD}30-hora-chrony${NC}, ${BOLD}40-firewall-nftables${NC}, ${BOLD}50-proxy-squid${NC}, ${BOLD}60-painel-web${NC}"
+ok "Módulo 00-base instalado (modo ${PAPEL})."
+if [ "$PAPEL" = "gateway" ]; then
+    echo -e "  Próximos: ${BOLD}10-banco-mariadb 20-dns-bind9 25-dns-interno-dnsmasq${NC}"
+    echo -e "            ${BOLD}30-hora-chrony 40-firewall-nftables 50-proxy-squid 60-painel-web${NC}"
+else
+    echo -e "  Próximos: ${BOLD}20-dns-bind9 25-dns-interno-dnsmasq 30-hora-chrony 60-painel-web${NC}"
+    echo    "  (firewall e NAT são do gateway — não se aplicam aqui)"
+fi
 echo ""
