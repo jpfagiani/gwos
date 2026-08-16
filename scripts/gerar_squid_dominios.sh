@@ -46,16 +46,33 @@ dedup_dominios() {
 
 # Whitelist: domínios com prefixo "." para cobrir subdomínios no Squid
 # Ex: gov.br → .gov.br (cobre receita.gov.br, www.gov.br, etc.)
-mysql_q "SELECT CONCAT('.', dominio) FROM dominios
-         WHERE tipo='whitelist' AND ativo=1
-         ORDER BY LENGTH(dominio), dominio" \
-    | dedup_dominios > "$SQUID_DIR/gwos_whitelist.txt"
+# As listas sao montadas em temporarios e so entao substituem as de producao.
+# O redirecionamento direto truncava o arquivo ANTES de a consulta rodar: um
+# banco fora do ar, uma senha trocada ou a tabela travada deixavam a whitelist
+# VAZIA — e o SSL Bump voltava a interceptar justamente os sites de governo
+# que ela existe para proteger. O erro so apareceria no navegador do usuario.
+TMP_W="$(mktemp)"; TMP_B="$(mktemp)"
+trap 'rm -f "$TMP_W" "$TMP_B"' EXIT
+
+if ! mysql_q "SELECT CONCAT('.', dominio) FROM dominios
+              WHERE tipo='whitelist' AND ativo=1
+              ORDER BY LENGTH(dominio), dominio" | dedup_dominios > "$TMP_W"; then
+    echo "ERRO: consulta da whitelist falhou — listas NAO alteradas." >&2
+    exit 1
+fi
 
 # Blacklist: mesma lógica
-mysql_q "SELECT CONCAT('.', dominio) FROM dominios
-         WHERE tipo='blacklist' AND ativo=1
-         ORDER BY LENGTH(dominio), dominio" \
-    | dedup_dominios > "$SQUID_DIR/gwos_blacklist.txt"
+if ! mysql_q "SELECT CONCAT('.', dominio) FROM dominios
+              WHERE tipo='blacklist' AND ativo=1
+              ORDER BY LENGTH(dominio), dominio" | dedup_dominios > "$TMP_B"; then
+    echo "ERRO: consulta da blacklist falhou — listas NAO alteradas." >&2
+    exit 1
+fi
+
+# As duas consultas passaram: so agora os arquivos de producao mudam, para uma
+# falha na segunda nao deixar as listas em estados de epocas diferentes.
+install -m 644 "$TMP_W" "$SQUID_DIR/gwos_whitelist.txt"
+install -m 644 "$TMP_B" "$SQUID_DIR/gwos_blacklist.txt"
 
 # Recarrega Squid (parse + reconfigure) — apenas se não for --no-reconfigure
 if [ "$NO_RECONFIGURE" -eq 0 ]; then
