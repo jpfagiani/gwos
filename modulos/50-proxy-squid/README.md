@@ -8,6 +8,19 @@
 | 3128 | HTTP transparente — o firewall redireciona para cá |
 | 3129 | HTTPS transparente com SSL Bump |
 
+## CONNECT (proxy explícito) e a porta 8443
+
+Um cliente com o proxy configurado explicitamente (GPO, PAC, campo "Servidor
+proxy" nas configurações do Windows) abre HTTPS via `CONNECT`, e o Squid só
+autoriza `CONNECT` para portas na ACL `SSL_ports` — **antes** de consultar a
+whitelist de domínios. `SSL_ports` cobre `443` e `8443` (a porta do
+portal-samba, pela convenção do projeto). Sem a 8443 ali, o portal do Samba
+fica inacessível para qualquer cliente que use este Squid como proxy explícito
+— cadastrar o domínio na whitelist não ajuda, porque a recusa acontece antes.
+
+Se uma unidade colocar outro serviço HTTPS em porta não padrão, acrescente a
+porta em `SSL_ports` (e em `Safe_ports`, para o método normal) neste arquivo.
+
 ## O que faz
 
 - Instala `squid-openssl` (cai para `squid` se não houver) e o `sarg` opcional
