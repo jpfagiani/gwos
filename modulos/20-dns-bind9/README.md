@@ -87,6 +87,13 @@ O `gwos-zona` valida o domínio e os IPs, roda `named-checkconf` **antes** de a
 alteração valer e desfaz sozinho se a configuração não passar. É o mesmo
 caminho que o painel usa — ele não escreve em `/etc/bind` por conta própria.
 
+> **`ZONAS_INTERNAS` do `gwos.conf` só vale na instalação.** É lida uma vez, por
+> este módulo, para criar as zonas iniciais do perfil da unidade. Editar essa
+> linha depois **não muda nada** — nem com `gwos-integrar`, que regenera os
+> forwarders e o encaminhamento do domínio interno, mas não as zonas (regerá-las
+> em bloco apagaria as que você acrescentou à mão). Para mudar uma zona depois da
+> instalação, use `gwos-zona`.
+
 Para escrever à mão, use **`/etc/bind/named.conf.zonas-locais`** — o instalador
 cria esse arquivo uma vez e nunca mais o toca. O `named.conf.local` **é
 sobrescrito** a cada reinstalação do módulo; zona escrita lá se perde.

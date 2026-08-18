@@ -18,24 +18,61 @@ que ele grava.
 - Liga o encaminhamento de pacotes em `/etc/sysctl.d/90-gwos-base.conf`
 - Grava `/etc/gwos/gwos.conf`
 
-## Exige duas placas de rede
+## Dois modos: gateway e servidor
 
-Este módulo roteia da internet (WAN) para a rede interna (LAN) — são duas
-interfaces diferentes, por definição. Numa máquina de uma placa só ele detecta,
-**não altera nada** e sai com código 2 (não aplicável, não é erro), indicando os
-módulos que fazem sentido ali.
+O módulo detecta quantas placas de rede a máquina tem e se ajusta:
 
-## Instalação
+| Modo | Quando | O que pergunta |
+|---|---|---|
+| **gateway** | duas ou mais placas, e você confirma | WAN, LAN, rede interna, rede secundária, `ip_forward` |
+| **servidor** | uma placa só, ou você recusa o papel de gateway | interface, endereçamento (manter/fixo/DHCP) — sem roteamento |
+
+Nos dois modos ele pergunta nome do servidor, domínio, perfil da unidade,
+resolvers e servidor de hora.
+
+## Instale-o sempre — inclusive num servidor de uma placa
+
+É ele quem grava o `/etc/gwos/gwos.conf`. **Sem esse arquivo, cada módulo
+seguinte adivinha a rede sozinho — e adivinha errado.** O sintoma real, numa
+máquina de uma placa:
+
+```
+[!] Sem /etc/gwos/gwos.conf — parâmetros detectados automaticamente:
+    WAN=enp0s3  LAN=enp0s3  rede=10.0.2.0/24  gateway=10.0.2.15
+```
+
+WAN e LAN na mesma placa, a rede antiga e o IP da própria máquina como gateway.
+O firewall gerado a partir disso descarta o tráfego da LAN e não encaminha nada.
+
+Um servidor só de DNS, hora, proxy ou painel também precisa dele — o modo
+`servidor` existe exatamente para isso e não toca no roteamento.
 
 ```bash
 bash instalar.sh
 ```
 
-É opcional: sem ele, cada módulo detecta a rede sozinho e cria o
-`gwos.conf` com os valores encontrados, sem mexer em `/etc/network/interfaces`.
-Instale-o quando esta máquina for de fato o gateway.
+## Cancelar é diferente de errar
 
-Servidor de DNS, hora, proxy ou painel **não precisa deste módulo**.
+No resumo final:
+
+| Resposta | O que acontece |
+|---|---|
+| `s` | aplica |
+| `n` | **refaz as perguntas**, com as respostas anteriores como padrão |
+| `c` | cancela e sai com código 3 — o `instalar-todos.sh` interrompe a instalação inteira, em vez de seguir para módulos que dependem deste |
+
+## O que é validado antes de gravar
+
+O `/etc/network/interfaces` é gerado a partir das respostas, e um valor inválido
+ali derruba a placa **no boot seguinte** — durante a instalação o `ip addr` ainda
+funciona e o erro passa despercebido. Por isso:
+
+- IP e máscara: octetos 0–255, prefixo 0–32, máscara contígua (`255.0.255.0` é recusada)
+- gateway: precisa ser um vizinho na mesma rede do IP; loopback, `0.0.0.0` e o
+  próprio endereço da máquina são recusados
+- gateway vazio é aceito, com aviso, e a linha simplesmente não vai para o
+  arquivo — escrever `gateway` sem valor faz o `ifup` abortar a interface inteira
+- o IP da LAN precisa pertencer à rede declarada
 
 ## Depois
 

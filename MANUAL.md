@@ -181,6 +181,46 @@ Detalhes completos em [`modulos/README.md`](modulos/README.md).
 
 ---
 
+### Convivência com o Samba e o portal de sistemas
+
+Os três projetos da unidade podem dividir a mesma máquina. Cada um atende numa
+porta fixa, igual em qualquer unidade:
+
+| Porta | Portal | Repositório | Quem usa |
+|---|---|---|---|
+| **80** | `portal-sistemas` | `jpfagiani/portal` | todos os usuários — atalhos |
+| **8080** | `portal-gateway` | `jpfagiani/gwos` | administração do gateway |
+| **8443** | `portal-samba` | `jpfagiani/smb` | administração dos arquivos |
+
+**Instale nesta ordem: GWOS → smb → portal.** O `bootstrap.sh` do Samba lê
+`/etc/gwos/modulos.d` para saber o que já existe na máquina. Invertendo a ordem,
+ele não encontra nada e o firewall dele bloqueia as portas do GWOS em silêncio.
+
+Quando os dois estão juntos, **o GWOS é o dono** de três recursos, e os
+instaladores dos outros projetos recuam sozinhos:
+
+| Recurso | Arquivo | Por quê |
+|---|---|---|
+| Firewall | `/etc/nftables.conf` | aqui ficam o NAT, o desvio para o Squid e o forçamento do DNS da LAN |
+| Hora | `/etc/chrony/conf.d/gwos.conf` | aqui ficam os `allow` que autorizam a LAN a pedir a hora |
+| Rede | `/etc/network/interfaces` | dois donos geram duas definições da mesma placa, e o `ifup` falha no boot |
+
+Para mudar qualquer um deles use as ferramentas do GWOS — nunca o instalador do
+outro projeto:
+
+```bash
+sudo gwos ip <novo-ip>                                    # endereçamento
+sudo gwos-definir NTP_SERVIDORES <ip> && sudo gwos-integrar   # fonte de hora
+sudo gwos-gerar-nftables                                  # firewall
+```
+
+No `bootstrap.sh` do Samba, com o GWOS já instalado: responda **`127.0.0.1`** no
+DNS (é o BIND9 local, e sobrevive a uma troca de IP) e **mantenha** o
+endereçamento como está. A pergunta do NTP nem aparece — o GWOS já é o dono do
+chrony e o valor viria a ser descartado.
+
+---
+
 ## 2. Atualizar sem Reinstalar
 
 ```bash
