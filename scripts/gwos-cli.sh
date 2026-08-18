@@ -456,6 +456,7 @@ cmd_help() {
     echo "  status                       Status de todos os serviços"
     echo "  reload [serviço]             Recarregar (all|squid|nginx|bind|dnsmasq|nftables|dominios)"
     echo "  diag                         Diagnóstico completo do sistema"
+    echo "  diag-painel                  Diagnóstico do painel web (PHP, arquivos, admins)"
     echo ""
     echo -e "${B}NAT 1:1:${N}"
     echo "  nat list                     Listar regras NAT"
@@ -604,7 +605,8 @@ cmd_resetsenha() {
     echo -e "${G}Token gerado para ${email}:${N}"
     echo -e "  ${B}${TOKEN}${N}"
     echo ""
-    echo "Encaminhe o token ao usuário. Ele deve acessar: https://<ip-gateway>/senha/reset"
+    echo "Encaminhe o token ao usuário. Ele deve acessar:"
+    echo "  http://$(hostname -I 2>/dev/null | awk '{print $1}'):${PAINEL_PORTA:-8080}/senha/reset"
     echo "O token expira em 24 horas."
     echo ""
 }
@@ -698,6 +700,7 @@ case "$CMD" in
     log|logs)           cmd_log "$@" ;;
     backup)             cmd_backup "$@" ;;
     diag|diagnostico)   cmd_diag ;;
+    diag-painel)        bash "$GWOS_DIR/scripts/diagnostico_painel.sh" ;;
     dns)                cmd_dns "$@" ;;
     ip|trocar-ip)       cmd_ip "$@" ;;
     update|atualizar)   cmd_update ;;

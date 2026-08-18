@@ -620,18 +620,6 @@ remover_pacotes() {
     ok "Removidos: ${seguros[*]}"
 }
 
-# Para um serviço só se ele for exclusivo do GWOS. Serviço compartilhado
-# (nginx com outros sites) é apenas recarregado, para o vizinho não cair.
-svc_parar_se_exclusivo() {
-    local svc="$1" motivo="$2"
-    if [ -n "$motivo" ]; then
-        systemctl reload "$svc" 2>/dev/null || systemctl restart "$svc" 2>/dev/null || true
-        aviso "${svc} mantido em execução — ${motivo}"
-    else
-        svc_parar "$svc"
-        ok "${svc} parado e desabilitado."
-    fi
-}
 
 backup_arquivo() {
     [ -f "$1" ] || return 0
