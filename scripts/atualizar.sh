@@ -134,7 +134,7 @@ if [ "$SIMULAR" -eq 1 ]; then
     fi
     command -v rsync >/dev/null || { falha "Instale rsync para simular a atualização."; exit 1; }
     info "Simulação: arquivos que seriam alterados em ${DESTINO}:"
-    rsync -ani --exclude '.env' --exclude 'storage/' --exclude 'docs/capturas/' "$NOVO/" "$DESTINO/" | sed -n '1,60p'
+    rsync -anic --exclude '.env' --exclude 'storage/' --exclude 'docs/capturas/' "$NOVO/" "$DESTINO/" | sed -n '1,60p'
     ok "Simulação concluída; nada foi alterado."; exit 0
 fi
 
@@ -224,7 +224,7 @@ trap 'reverter' ERR
 # ── 4. Copia o código novo (preserva .env, storage e capturas) ─────────
 if [ "$NO_LOCAL" -eq 0 ]; then
     info "Copiando o código novo..."
-    rsync -a --exclude '.env' --exclude '/storage/' --exclude '/.git/' --exclude 'docs/capturas/' "$NOVO/" "$DESTINO/"
+    rsync -ac --exclude '.env' --exclude '/storage/' --exclude '/.git/' --exclude 'docs/capturas/' "$NOVO/" "$DESTINO/"
 fi
 mkdir -p "$DESTINO/storage/tarefas"
 chmod +x "$DESTINO"/scripts/*.sh "$DESTINO"/modulos/*.sh "$DESTINO"/modulos/*/*.sh 2>/dev/null || true
