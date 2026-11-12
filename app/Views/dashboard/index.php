@@ -7,10 +7,35 @@ $podeEditar = pode_editar();
 $servicosParados = array_filter($servicosLista, static fn(array $servico): bool => !$servico['ativo']);
 $estadoWan = $estado[0] === 'erro';
 ?>
-<div class="row g-3 mb-3">
-  <div class="col-xl-6">
-    <div class="gw-card">
-      <div class="gw-titulo"><span><i class="bi bi-bar-chart-fill"></i>Estado Geral da Rede</span></div>
+<div class="gw-resumo-rede">
+  <div class="gw-resumo-interfaces" aria-label="Interfaces de rede">
+  <div class="gw-resumo-interface">
+    <div class="gw-iface wan">
+      <div class="gw-resumo-interface-dados">
+      <div class="tit"><i class="bi bi-globe2"></i> WAN – Internet</div>
+      <?php $wOk = $wan['existe'] && in_array($wan['estado'], ['up', 'unknown'], true); ?>
+      <div class="lin"><span class="p <?= $wOk ? '' : 'off' ?>"></span><span id="wanEstado"><?= !$wan['existe'] ? 'Interface não configurada' : ($wOk ? 'Conectada' : 'Sem link') ?></span></div>
+      <div class="lin"><span class="p <?= $wan['ip'] ? '' : 'off' ?>"></span><span id="wanIp" class="font-monospace"><?= h($wan['ip'] ?? 'sem IP') ?></span></div>
+      <div class="taxa" id="wanLabel">coletando…</div>
+      </div>
+      <div class="spark"><canvas id="sparkWan"></canvas></div>
+    </div>
+  </div>
+  <div class="gw-resumo-interface">
+    <div class="gw-iface lan">
+      <div class="gw-resumo-interface-dados">
+      <div class="tit"><i class="bi bi-diagram-3-fill"></i> LAN – Interna</div>
+      <?php $lOk = $lan['existe'] && in_array($lan['estado'], ['up', 'unknown'], true); ?>
+      <div class="lin"><span class="p <?= $lOk ? '' : 'off' ?>"></span><span id="lanEstado"><?= !$lan['existe'] ? 'Interface não configurada' : ($lOk ? 'Ativa' : 'Sem link') ?></span></div>
+      <div class="lin"><span class="p <?= $lan['ip'] ? '' : 'off' ?>"></span><span id="lanIp" class="font-monospace"><?= h($lan['ip'] ?? 'sem IP') ?></span></div>
+      <div class="taxa" id="lanLabel">coletando…</div>
+      </div>
+      <div class="spark"><canvas id="sparkLan"></canvas></div>
+    </div>
+  </div>
+  </div>
+    <section class="gw-card gw-resumo-estado" aria-labelledby="tituloResumoRede">
+      <div class="gw-titulo" id="tituloResumoRede"><span><i class="bi bi-bar-chart-fill"></i>Estado Geral da Rede</span></div>
       <div class="gw-estado">
         <div id="estadoRedeSelo" class="selo <?= h($estado[0]) ?>" data-wan-sem-link="<?= $estadoWan ? '1' : '0' ?>">
           <div class="ico"><i id="estadoRedeIcone" class="bi <?= $icEstado[$estado[0]] ?>" aria-hidden="true"></i></div>
@@ -24,32 +49,16 @@ $estadoWan = $estado[0] === 'erro';
             </ul>
           </div>
         </div>
-        <div class="num"><div class="r">Dispositivos Conectados</div><div class="v"><i class="bi bi-pc-display"></i><?= number_format($conectados) ?></div><div class="small text-muted">vistos em 15 min</div></div>
+        <div class="gw-resumo-metricas">
+          <div class="num"><div class="r">Dispositivos Conectados</div><div class="v"><i class="bi bi-pc-display"></i><?= number_format($conectados) ?></div><div class="small text-muted">vistos em 15 min</div></div>
         <div class="num"><div class="r">Bloqueados</div><div class="v neg"><i class="bi bi-slash-circle"></i><?= number_format($bloqueiosHoje) ?></div><div class="small text-muted">acessos hoje</div></div>
-        <div class="num"><div class="r">Tráfego Atual</div><div class="v"><i class="bi bi-arrow-down-up"></i><span id="trafegoAtual" style="font-size:1.35rem">—</span></div><div class="small text-muted">WAN (↓+↑)</div></div>
+        <div class="num"><div class="r">Tráfego Atual</div><div class="v"><i class="bi bi-arrow-down-up"></i><span id="trafegoAtual">—</span></div><div class="small text-muted">WAN (↓+↑)</div></div>
+          <a class="num gw-resumo-link" href="/internet"><div class="r">Sessões ativas</div><div class="v"><i class="bi bi-person-lock" aria-hidden="true"></i><?= number_format($sessoesAtivas) ?></div><div class="small text-muted">portal de internet</div></a>
+          <a class="num gw-resumo-link" href="/alertas"><div class="r">Alertas abertos</div><div class="v"><i class="bi bi-bell" aria-hidden="true"></i><?= number_format($alertasAbertos) ?></div><div class="small text-muted">ver alertas e eventos</div></a>
+          <a class="num gw-resumo-link" href="/diagnostico"><div class="r">Serviços online</div><div class="v"><i class="bi bi-hdd-network" aria-hidden="true"></i><span id="resumoServicosOnline"><?= count($servicosLista) - count($servicosParados) ?>/<?= count($servicosLista) ?></span></div><div class="small text-muted">ver diagnóstico</div></a>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="gw-iface wan">
-      <div class="tit"><i class="bi bi-globe2"></i> WAN – Internet</div>
-      <?php $wOk = $wan['existe'] && in_array($wan['estado'], ['up', 'unknown'], true); ?>
-      <div class="lin"><span class="p <?= $wOk ? '' : 'off' ?>"></span><span id="wanEstado"><?= !$wan['existe'] ? 'Interface não configurada' : ($wOk ? 'Conectada' : 'Sem link') ?></span></div>
-      <div class="lin"><span class="p <?= $wan['ip'] ? '' : 'off' ?>"></span><span id="wanIp" class="font-monospace"><?= h($wan['ip'] ?? 'sem IP') ?></span></div>
-      <div class="taxa" id="wanLabel">coletando…</div>
-      <div class="spark"><canvas id="sparkWan"></canvas></div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="gw-iface lan">
-      <div class="tit"><i class="bi bi-diagram-3-fill"></i> LAN – Interna</div>
-      <?php $lOk = $lan['existe'] && in_array($lan['estado'], ['up', 'unknown'], true); ?>
-      <div class="lin"><span class="p <?= $lOk ? '' : 'off' ?>"></span><span id="lanEstado"><?= !$lan['existe'] ? 'Interface não configurada' : ($lOk ? 'Ativa' : 'Sem link') ?></span></div>
-      <div class="lin"><span class="p <?= $lan['ip'] ? '' : 'off' ?>"></span><span id="lanIp" class="font-monospace"><?= h($lan['ip'] ?? 'sem IP') ?></span></div>
-      <div class="taxa" id="lanLabel">coletando…</div>
-      <div class="spark"><canvas id="sparkLan"></canvas></div>
-    </div>
-  </div>
+    </section>
 </div>
 
 <div class="row g-3 mb-3">
@@ -258,6 +267,7 @@ $estadoWan = $estado[0] === 'erro';
                     (s.ativo ? 'ok">Online' : 'bad">Parado') + '</span></li>').join('');
             }
             const parados = lista.filter(s => !s.ativo);
+            document.getElementById('resumoServicosOnline').textContent = (lista.length - parados.length) + '/' + lista.length;
             const links = document.getElementById('estadoRedeServicos');
             links.innerHTML = parados.map(s => '<li>' + linkServico(s) + '</li>').join('');
             links.hidden = parados.length === 0;

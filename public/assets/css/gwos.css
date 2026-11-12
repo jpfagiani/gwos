@@ -360,3 +360,49 @@ body.login-page {
 .gw-servico-diagnostico { scroll-margin-top: calc(var(--gw-header-h) + 1rem); }
 .gw-servico-diagnostico:target { background: color-mix(in srgb, var(--gw-accent) 12%, var(--gw-card)); }
 .gw-servico-diagnostico:target td:first-child { box-shadow: inset 3px 0 var(--gw-accent); }
+
+/* Resumo do dashboard: duas interfaces empilhadas e indicadores ao lado. */
+.gw-resumo-rede {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+    gap: .75rem;
+    margin-bottom: .85rem;
+    container-type: inline-size;
+}
+.gw-resumo-interfaces { display: grid; grid-template-rows: 1fr 1fr; gap: .65rem; min-width: 0; }
+.gw-resumo-interface { display: flex; min-width: 0; }
+.gw-resumo-rede .gw-iface {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(52px, 35%);
+    align-items: center; gap: .55rem; width: 100%; height: auto;
+    padding: .55rem .75rem; border-radius: 9px;
+}
+.gw-resumo-interface-dados { min-width: 0; }
+.gw-resumo-rede .gw-iface .tit { font-size: .88rem; gap: .35rem; }
+.gw-resumo-rede .gw-iface .lin, .gw-resumo-rede .gw-iface .taxa { font-size: .74rem; margin-top: .13rem; overflow-wrap: anywhere; }
+.gw-resumo-rede .gw-iface .spark { height: 40px; min-height: 0; min-width: 0; margin: 0; overflow: hidden; }
+.gw-resumo-rede .gw-iface .spark canvas { position: absolute; inset: 0; }
+.gw-resumo-estado .gw-estado { display: grid; gap: .45rem; flex: 1; padding: .15rem .7rem .6rem; }
+.gw-resumo-estado .selo { min-width: 0; border: 0; padding: 0 .2rem; gap: .45rem; }
+.gw-resumo-estado .selo .ico { width: 29px; height: 29px; font-size: .9rem; }
+.gw-resumo-estado .selo .t { font-size: .9rem; }
+.gw-resumo-estado .selo .d { font-size: .73rem; }
+.gw-resumo-metricas { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; }
+.gw-resumo-estado .num {
+    display: flex; flex-direction: column; justify-content: center; min-width: 0;
+    border: 0; border-top: 1px solid var(--gw-border); padding: .32rem .16rem;
+}
+.gw-resumo-estado .num .r, .gw-resumo-estado .num .small { font-size: .69rem; }
+.gw-resumo-estado .num .v { font-size: 1rem; gap: .25rem; }
+.gw-resumo-estado .num .v i { font-size: .85rem; }
+.gw-resumo-link { text-decoration: none; color: var(--gw-text); }
+.gw-resumo-link:hover { background: color-mix(in srgb, var(--gw-accent) 7%, var(--gw-card)); }
+.gw-resumo-link:focus-visible { outline-offset: -2px; }
+@media (max-width: 620px) {
+    .gw-resumo-rede { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 620px) {
+    .gw-resumo-rede .gw-iface { grid-template-columns: minmax(0,1fr) minmax(40px,25%); }
+}
+@media (max-width: 370px) {
+    .gw-resumo-metricas { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
