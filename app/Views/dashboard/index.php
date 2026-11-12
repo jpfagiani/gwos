@@ -148,7 +148,7 @@ $estadoWan = $estado[0] === 'erro';
   <div class="col-12">
     <div class="gw-card">
       <div class="gw-titulo"><span><i class="bi bi-calendar3"></i>Agenda de Políticas de Acesso</span><a href="/agenda">Ver calendário →</a></div>
-      <div class="gw-corpo">
+      <div class="gw-corpo table-responsive" tabindex="0" role="region" aria-label="Agenda de políticas de acesso">
         <?php if (!$agenda): ?><div class="gw-vazio">Nenhuma regra de horário ativa cadastrada.</div><?php else: ?>
         <table class="gw-agenda"><thead><tr><th>Regra / horário</th><?php foreach (['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] as $d): ?><th><?= $d ?></th><?php endforeach; ?></tr></thead><tbody>
         <?php foreach ($agenda as $r): ?><tr><td title="<?= h($r['grupo_nome'] ?? 'Todos os grupos') ?>"><?= h(substr($r['hora_inicio'], 0, 2)) ?>h–<?= h(substr($r['hora_fim'], 0, 2)) ?>h <span class="text-muted fw-normal"><?= h(mb_strimwidth($r['nome'], 0, 14, '…')) ?></span></td>

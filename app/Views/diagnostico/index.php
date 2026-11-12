@@ -4,10 +4,10 @@ $rot = ['ok' => ['OK', 'check-circle-fill'], 'warn' => ['Atenção', 'exclamatio
 <div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="/tarefas"><i class="bi bi-list-task"></i> Histórico de tarefas</a><a class="btn btn-primary btn-sm" href="/diagnostico"><i class="bi bi-arrow-repeat"></i> Reexecutar</a></div></div>
 <div class="row g-3">
 <?php foreach ($checks as $grupo => $itens): ?>
-  <div class="col-lg-6"><div class="gw-card"><div class="gw-titulo"><span><i class="bi bi-clipboard2-pulse"></i><?= h($grupo) ?></span></div>
-    <div class="gw-corpo sem-pad"><table class="gw-tabela"><tbody>
+  <div class="col-lg-6"><div class="gw-card gw-card--natural"><div class="gw-titulo"><span><i class="bi bi-clipboard2-pulse"></i><?= h($grupo) ?></span></div>
+    <div class="gw-corpo sem-pad table-responsive"><table class="gw-tabela"><tbody>
     <?php foreach ($itens as $c): [$t, $ic] = $rot[$c['estado']]; ?>
-      <tr<?php if ($grupo === 'Serviços'): ?> id="servico-<?= h($c['nome']) ?>" class="gw-servico-diagnostico"<?php endif; ?>><td style="width:38%"><?= h($c['nome']) ?></td><td><span class="st <?= $c['estado'] === 'ok' ? 'ok' : ($c['estado'] === 'bad' ? 'bad' : ($c['estado'] === 'warn' ? 'warn' : 'nd')) ?>"><i class="bi bi-<?= $ic ?>"></i><?= $t ?></span></td><td class="text-muted gw-detalhe"><?= h($c['detalhe']) ?></td></tr>
+      <tr<?php if ($grupo === 'Serviços'): ?> id="servico-<?= h($c['nome']) ?>" class="gw-servico-diagnostico"<?php endif; ?>><td class="gw-diagnostico-verificacao"><?= h($c['nome']) ?></td><td><span class="st <?= $c['estado'] === 'ok' ? 'ok' : ($c['estado'] === 'bad' ? 'bad' : ($c['estado'] === 'warn' ? 'warn' : 'nd')) ?>"><i class="bi bi-<?= $ic ?>"></i><?= $t ?></span></td><td class="text-muted gw-detalhe"><?= h($c['detalhe']) ?></td></tr>
     <?php endforeach; ?></tbody></table></div></div></div>
 <?php endforeach; ?>
 </div>

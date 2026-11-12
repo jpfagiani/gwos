@@ -46,7 +46,7 @@
                     <?php else: ?><span class="text-muted">IP isento de login</span><?php endif; ?>
                 </td>
                 <td><?= h($r['metodo']) ?></td>
-                <td style="max-width:420px" class="text-truncate" title="<?= h($r['url']) ?>"><?= h($r['dominio']) ?></td>
+                <td class="gw-texto-longo" title="<?= h($r['url']) ?>"><?= h($r['dominio']) ?></td>
                 <td><span class="badge bg-<?= str_contains($r['status'], 'DENIED') ? 'danger' : 'secondary' ?>"><?= h($r['status']) ?></span></td>
             </tr>
         <?php endforeach; ?>
