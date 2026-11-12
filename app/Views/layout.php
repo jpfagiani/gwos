@@ -91,7 +91,9 @@ if ($menuTemBanco) {
             </button>
             <ul class="dropdown-menu dropdown-menu-end shadow">
                 <li><a class="dropdown-item" href="/senha/trocar"><i class="bi bi-key-fill me-2"></i>Alterar senha</a></li>
-                <?php if ($adminPerfil === 'superadmin'): ?><li><a class="dropdown-item" href="/senha/gerar"><i class="bi bi-person-lock me-2"></i>Reset de senha</a></li><?php endif; ?>
+                <?php if ($adminPerfil === 'superadmin'): ?>
+                <li><a class="dropdown-item" href="/administradores"><i class="bi bi-people me-2"></i>Administradores do painel</a></li>
+                <li><a class="dropdown-item" href="/senha/gerar"><i class="bi bi-person-lock me-2"></i>Reset de senha</a></li><?php endif; ?>
                 <li><button class="dropdown-item" type="button" id="btnTema"><i class="bi bi-moon-stars me-2"></i>Tema escuro</button></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><form method="post" action="/logout" class="m-0"><?= csrf_field() ?><button class="dropdown-item text-danger" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Sair</button></form></li>

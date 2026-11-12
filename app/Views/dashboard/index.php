@@ -4,13 +4,26 @@ $tipoCor = ['liberado' => 'success', 'parcial' => 'warning', 'bloqueado' => 'dan
 $dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 $maxRank = 0; foreach ($rankingHoje as $r) { $maxRank = max($maxRank, (int) $r['download_bytes'] + (int) $r['upload_bytes']); }
 $podeEditar = pode_editar();
+$servicosParados = array_filter($servicosLista, static fn(array $servico): bool => !$servico['ativo']);
+$estadoWan = $estado[0] === 'erro';
 ?>
 <div class="row g-3 mb-3">
   <div class="col-xl-6">
     <div class="gw-card">
       <div class="gw-titulo"><span><i class="bi bi-bar-chart-fill"></i>Estado Geral da Rede</span></div>
       <div class="gw-estado">
-        <div class="selo <?= h($estado[0]) ?>"><div class="ico"><i class="bi <?= $icEstado[$estado[0]] ?>"></i></div><div><div class="t"><?= h($estado[1]) ?></div><div class="d"><?= h($estado[2]) ?></div></div></div>
+        <div id="estadoRedeSelo" class="selo <?= h($estado[0]) ?>" data-wan-sem-link="<?= $estadoWan ? '1' : '0' ?>">
+          <div class="ico"><i id="estadoRedeIcone" class="bi <?= $icEstado[$estado[0]] ?>" aria-hidden="true"></i></div>
+          <div class="estado-rede-texto">
+            <div class="t" id="estadoRedeTitulo"><?= h($estado[1]) ?></div>
+            <div class="d" id="estadoRedeDescricao"><?= h($estado[2]) ?></div>
+            <ul id="estadoRedeServicos" class="estado-rede-servicos" <?= $servicosParados ? '' : 'hidden' ?>>
+              <?php foreach ($servicosParados as $sv): ?>
+              <li><a href="/diagnostico#servico-<?= rawurlencode($sv['id']) ?>"><?= h($sv['nome']) ?> →</a></li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
+        </div>
         <div class="num"><div class="r">Dispositivos Conectados</div><div class="v"><i class="bi bi-pc-display"></i><?= number_format($conectados) ?></div><div class="small text-muted">vistos em 15 min</div></div>
         <div class="num"><div class="r">Bloqueados</div><div class="v neg"><i class="bi bi-slash-circle"></i><?= number_format($bloqueiosHoje) ?></div><div class="small text-muted">acessos hoje</div></div>
         <div class="num"><div class="r">Tráfego Atual</div><div class="v"><i class="bi bi-arrow-down-up"></i><span id="trafegoAtual" style="font-size:1.35rem">—</span></div><div class="small text-muted">WAN (↓+↑)</div></div>
@@ -159,7 +172,7 @@ $podeEditar = pode_editar();
       <div class="gw-corpo">
         <?php if (!$servicosLista): ?><div class="gw-vazio">Nenhum módulo com serviço registrado.</div><?php else: ?>
         <ul class="gw-servicos" id="listaServicos">
-        <?php foreach ($servicosLista as $sv): ?><li><i class="bi bi-<?= $sv['ativo'] ? 'check-circle-fill ok' : 'x-circle-fill bad' ?>"></i><?= h($sv['nome']) ?><span class="est <?= $sv['ativo'] ? 'st ok' : 'st bad' ?>"><?= $sv['ativo'] ? 'Online' : 'Parado' ?></span></li><?php endforeach; ?></ul><?php endif; ?>
+        <?php foreach ($servicosLista as $sv): ?><li><i class="bi bi-<?= $sv['ativo'] ? 'check-circle-fill ok' : 'x-circle-fill bad' ?>"></i><?php if ($sv['ativo']): ?><?= h($sv['nome']) ?><?php else: ?><a href="/diagnostico#servico-<?= rawurlencode($sv['id']) ?>"><?= h($sv['nome']) ?></a><?php endif; ?><span class="est <?= $sv['ativo'] ? 'st ok' : 'st bad' ?>"><?= $sv['ativo'] ? 'Online' : 'Parado' ?></span></li><?php endforeach; ?></ul><?php endif; ?>
       </div>
       <div class="gw-rodape">Só módulos realmente instalados. CPU, memória, disco e uptime em <a href="/diagnostico">Diagnóstico</a>.</div>
     </div>
@@ -230,8 +243,35 @@ $podeEditar = pode_editar();
     }
     atualizar();
 
-    async function servicos(){ try { const r = await fetch('/dashboard/servicos', {cache:'no-store'}); if(!r.ok) return; const j = await r.json(); const ul = document.getElementById('listaServicos'); if(!ul) return;
-        ul.innerHTML = j.servicos.map(s => '<li><i class="bi bi-'+(s.ativo?'check-circle-fill ok':'x-circle-fill bad')+'"></i>'+esc(s.nome)+'<span class="est st '+(s.ativo?'ok':'bad')+'">'+(s.ativo?'Online':'Parado')+'</span></li>').join(''); } catch(e){} }
+    const linkServico = s => '<a href="/diagnostico#servico-' + encodeURIComponent(s.id) + '">' + esc(s.nome) + '</a>';
+    async function servicos() {
+        try {
+            const resposta = await fetch('/dashboard/servicos', {cache: 'no-store'});
+            if (!resposta.ok) return;
+            const {servicos: lista} = await resposta.json();
+            if (!Array.isArray(lista)) return;
+            const tabela = document.getElementById('listaServicos');
+            if (tabela) {
+                tabela.innerHTML = lista.map(s => '<li><i class="bi bi-' +
+                    (s.ativo ? 'check-circle-fill ok' : 'x-circle-fill bad') + '"></i>' +
+                    (s.ativo ? esc(s.nome) : linkServico(s)) + '<span class="est st ' +
+                    (s.ativo ? 'ok">Online' : 'bad">Parado') + '</span></li>').join('');
+            }
+            const parados = lista.filter(s => !s.ativo);
+            const links = document.getElementById('estadoRedeServicos');
+            links.innerHTML = parados.map(s => '<li>' + linkServico(s) + '</li>').join('');
+            links.hidden = parados.length === 0;
+            const selo = document.getElementById('estadoRedeSelo');
+            if (selo.dataset.wanSemLink === '1') return;
+            const estado = !lista.length ? ['nd', 'bi-question-lg', 'Sem dados', 'Nenhum serviço registrado para verificar.']
+                : parados.length ? ['aviso', 'bi-exclamation-lg', 'Atenção', 'Há serviços que precisam de verificação.']
+                : ['ok', 'bi-check-lg', 'Rede Operacional', 'Tudo funcionando normalmente'];
+            selo.className = 'selo ' + estado[0];
+            document.getElementById('estadoRedeIcone').className = 'bi ' + estado[1];
+            document.getElementById('estadoRedeTitulo').textContent = estado[2];
+            document.getElementById('estadoRedeDescricao').textContent = estado[3];
+        } catch {}
+    }
     setInterval(servicos, 30000);
 
     document.getElementById('formSim').addEventListener('submit', async ev => {

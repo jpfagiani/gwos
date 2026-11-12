@@ -89,7 +89,7 @@ async function adicionarDominio(e, tipo) {
         erroEl.textContent = data.erro;
         erroEl.classList.remove('d-none');
     } else {
-        location.reload();
+        recarregarPainel();
     }
 }
 
@@ -100,7 +100,7 @@ async function removerDominio(id, dominio) {
     fd.append('_method', 'DELETE');
     const res = await fetch('/dominios/' + id, { method: 'POST', body: fd });
     const data = await res.json();
-    if (data.erro) { alert(data.erro); } else { location.reload(); }
+    if (data.erro) { alert(data.erro); } else { recarregarPainel(); }
 }
 
 document.querySelectorAll('.busca-dominio').forEach(input => {

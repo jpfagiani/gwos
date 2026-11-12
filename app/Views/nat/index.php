@@ -116,7 +116,7 @@ document.getElementById('formNova').addEventListener('submit', async function(e)
     if (j.erro) { mostrarAlerta(j.erro, 'danger'); return; }
     mostrarAlerta(j.sucesso, 'success');
     bootstrap.Modal.getInstance(document.getElementById('modalNova')).hide();
-    setTimeout(() => location.reload(), 800);
+    setTimeout(() => recarregarPainel(), 800);
 });
 
 async function toggleNat(id, ativo) {
@@ -128,7 +128,7 @@ async function toggleNat(id, ativo) {
     const j = await r.json();
     if (j.erro) { mostrarAlerta(j.erro, 'danger'); return; }
     mostrarAlerta(j.sucesso, 'success');
-    setTimeout(() => location.reload(), 800);
+    setTimeout(() => recarregarPainel(), 800);
 }
 
 async function removerNat(id) {
@@ -141,7 +141,7 @@ async function removerNat(id) {
     const j = await r.json();
     if (j.erro) { mostrarAlerta(j.erro, 'danger'); return; }
     mostrarAlerta(j.sucesso, 'success');
-    setTimeout(() => location.reload(), 800);
+    setTimeout(() => recarregarPainel(), 800);
 }
 
 async function aplicarTodas() {

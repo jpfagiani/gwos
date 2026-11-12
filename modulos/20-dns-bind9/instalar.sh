@@ -274,7 +274,7 @@ elif command -v dig >/dev/null 2>&1 && [ -n "$(dig +short +time=3 +tries=1 googl
     {
         echo "# Gerado pelo GWOS (20-dns-bind9). BIND local primeiro; forwarders como reserva."
         echo "nameserver 127.0.0.1"
-        for _f in ${DNS_FORWARDERS:-8.8.8.8 1.1.1.1}; do echo "nameserver ${_f}"; done | head -2
+        for _f in $DNS_FORWARDERS; do echo "nameserver ${_f}"; done | head -2
         [ -n "${DOMINIO_LOCAL:-}" ] && echo "search ${DOMINIO_LOCAL}"
     } > "$_RC_NOVO"
     if ! cmp -s "$_RC_NOVO" /etc/resolv.conf 2>/dev/null; then

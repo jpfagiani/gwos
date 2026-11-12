@@ -9,7 +9,7 @@
     <title><?= h($titulo ?? 'Acesso à internet') ?> — GWOS</title>
     <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="/assets/css/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/assets/css/gwos.css">
+    <link rel="stylesheet" href="/assets/css/gwos.css?v=<?= h(config('app.versao')) ?>">
 </head>
 <body class="login-page portal-acesso">
 <div class="login-caixa">

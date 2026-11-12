@@ -86,7 +86,7 @@ try { $gruposModal = \App\Core\Politicas::grupos(); } catch (\Throwable $e) { $g
                 j.resultados.map(r => '<li><span class="font-monospace">'+esc(r.ip)+'</span> — '+esc(r.ok ? r.mensagem : r.erro)+'</li>').join('')+'</ul>'; passo(3);
         } else erro(j.erro || 'Falha ao aplicar.');
     });
-    el.addEventListener('hidden.bs.modal', () => { if (!$('acaoPasso3').classList.contains('d-none')) location.reload(); });
+    el.addEventListener('hidden.bs.modal', () => { if (!$('acaoPasso3').classList.contains('d-none')) recarregarPainel(); });
     document.addEventListener('click', ev => { const b = ev.target.closest('[data-gw-acao]'); if (!b) return; ev.preventDefault();
         let ips = []; if (b.dataset.gwIps) ips = b.dataset.gwIps.split(',');
         else if (b.dataset.gwSelecao) ips = [...document.querySelectorAll(b.dataset.gwSelecao + ':checked')].map(x => x.value);

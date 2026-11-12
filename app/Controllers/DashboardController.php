@@ -260,7 +260,7 @@ class DashboardController extends Controller
         $inativos = count(array_filter($servicos, static fn($a) => !$a));
         if (!$servicos) { $estado = ['nd', 'Sem dados', 'Nenhum serviço registrado para verificar.']; }
         elseif ($wan['existe'] && $wan['estado'] !== null && $wan['estado'] !== 'up' && $wan['estado'] !== 'unknown') { $estado = ['erro', 'WAN sem link', 'A interface WAN não está ativa.']; }
-        elseif ($inativos > 0) { $estado = ['aviso', 'Atenção', $inativos . ' serviço(s) parado(s)']; }
+        elseif ($inativos > 0) { $estado = ['aviso', 'Atenção', 'Há serviços que precisam de verificação.']; }
         else { $estado = ['ok', 'Rede Operacional', 'Tudo funcionando normalmente']; }
 
         $rankingHoje = \App\Core\Monitoramento::ranking('24h', 10);

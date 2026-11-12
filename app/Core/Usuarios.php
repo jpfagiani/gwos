@@ -79,16 +79,65 @@ class Usuarios
             return true;
         }
 
-        $usuarios = self::lerArquivo();
-        foreach ($usuarios as &$usuario) {
-            if ((int) $usuario['id'] === $id) {
-                foreach ($campos as $campo => $valor) {
-                    $usuario[$campo] = $valor;
+        try {
+            return self::comArquivoBloqueado(static function () use ($id, $campos): bool {
+                $usuarios = self::lerArquivo(true);
+                foreach ($usuarios as $indice => $usuario) {
+                    if ((int) $usuario['id'] === $id) {
+                        $usuarios[$indice] = array_replace($usuario, $campos);
+                        return self::gravarArquivo($usuarios);
+                    }
                 }
-            }
+                return false;
+            }) ?? false;
+        } catch (\RuntimeException) {
+            return false;
         }
-        unset($usuario);
-        return self::gravarArquivo($usuarios);
+    }
+
+    /** Cria uma conta administrativa. Retorna null se o e-mail já estiver cadastrado. */
+    public static function criar(string $nome, string $email, string $perfil, string $senha): ?int
+    {
+        $hash = password_hash($senha, PASSWORD_BCRYPT, ['cost' => 12]);
+        if (self::usandoBanco()) {
+            try {
+                $id = Database::insert(
+                    'INSERT INTO admins (nome, email, perfil, senha, primeiro_login) VALUES (?, ?, ?, ?, 1)',
+                    [$nome, $email, $perfil, $hash]
+                );
+            } catch (\PDOException $e) {
+                if ((int) ($e->errorInfo[1] ?? 0) === 1062) {
+                    return null;
+                }
+                throw $e;
+            }
+            return (int) $id;
+        }
+
+        $id = self::comArquivoBloqueado(static function () use ($nome, $email, $perfil, $hash): int {
+            $usuarios = self::lerArquivo(true);
+            $maiorId = 0;
+            foreach ($usuarios as $usuario) {
+                if (strcasecmp($usuario['email'], $email) === 0) {
+                    return 0;
+                }
+                $maiorId = max($maiorId, (int) $usuario['id']);
+            }
+            $id = $maiorId + 1;
+            $usuarios[] = [
+                'id' => $id, 'nome' => $nome, 'email' => $email, 'perfil' => $perfil,
+                'senha' => $hash, 'ativo' => 1, 'primeiro_login' => 1, 'tentativas' => 0,
+                'ultimo_login' => null, 'bloqueado_ate' => null, 'reset_token' => null, 'reset_expira' => null,
+            ];
+            if (!self::gravarArquivo($usuarios)) {
+                throw new \RuntimeException('Falha ao gravar usuários do painel.');
+            }
+            return $id;
+        });
+        if ($id === null) {
+            throw new \RuntimeException('Arquivo de usuários do painel indisponível.');
+        }
+        return $id ?: null;
     }
 
     /** Marca o último login com a hora atual (NOW() no banco). */
@@ -113,14 +162,31 @@ class Usuarios
     // Arquivo
     // -----------------------------------------------------------------
 
-    private static function lerArquivo(): array
+    private static function comArquivoBloqueado(callable $operacao): mixed
+    {
+        $lock = @fopen(self::ARQUIVO . '.lock', 'c');
+        if ($lock === false) {
+            return null;
+        }
+        try {
+            return flock($lock, LOCK_EX) ? $operacao() : null;
+        } finally {
+            fclose($lock);
+        }
+    }
+
+    private static function lerArquivo(bool $estrito = false): array
     {
         $caminho = is_readable(self::ARQUIVO) ? self::ARQUIVO
                  : (is_readable(self::ARQUIVO_ANTIGO) ? self::ARQUIVO_ANTIGO : null);
         if ($caminho === null) {
+            if ($estrito) throw new \RuntimeException('Arquivo de usuários ilegível.');
             return [];
         }
         $dados = json_decode((string) @file_get_contents($caminho), true);
+        if ($estrito && (!is_array($dados) || !array_is_list($dados))) {
+            throw new \RuntimeException('Arquivo de usuários inválido.');
+        }
         return is_array($dados) ? $dados : [];
     }
 

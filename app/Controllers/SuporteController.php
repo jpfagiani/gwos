@@ -15,8 +15,11 @@ class SuporteController extends Controller
             $checks[$grupo][] = ['nome' => $nome, 'estado' => $estado, 'detalhe' => $detalhe];
         };
 
+        $servicosVerificados = [];
         foreach (Modulos::instalados() as $m) {
             foreach ($m['servicos'] as $svc) {
+                if (isset($servicosVerificados[$svc])) continue;
+                $servicosVerificados[$svc] = true;
                 $ativo = trim((string) shell_exec('systemctl is-active ' . escapeshellarg($svc) . ' 2>/dev/null')) === 'active';
                 $add('Serviços', $svc, $ativo ? 'ok' : 'bad', $ativo ? 'ativo' : 'parado ou não verificável');
             }

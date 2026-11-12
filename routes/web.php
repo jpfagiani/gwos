@@ -52,6 +52,9 @@ $router->get('/configuracoes', 'ConfigController@index');
 $router->post('/configuracoes', 'ConfigController@salvar');
 $router->post('/configuracoes/historico/{id}/reverter', 'ConfigController@reverter');
 
+$router->get('/administradores', 'AdministradorController@index');
+$router->post('/administradores', 'AdministradorController@criar');
+
 $router->get('/senha/trocar',  'SenhaController@formularioTrocar');
 $router->post('/senha/trocar', 'SenhaController@trocar');
 $router->get('/senha/reset',   'SenhaController@formularioReset');

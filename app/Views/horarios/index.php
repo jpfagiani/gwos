@@ -151,7 +151,7 @@ document.getElementById('formHorario').addEventListener('submit', async e => {
         document.getElementById('erroHorario').textContent = data.erro;
         document.getElementById('erroHorario').classList.remove('d-none');
     } else {
-        location.reload();
+        recarregarPainel();
     }
 });
 
@@ -162,6 +162,6 @@ async function removerHorario(id, nome) {
     fd.append('_method', 'DELETE');
     const res = await fetch('/horarios/' + id, { method: 'POST', body: fd });
     const data = await res.json();
-    if (data.erro) { alert(data.erro); } else { location.reload(); }
+    if (data.erro) { alert(data.erro); } else { recarregarPainel(); }
 }
 </script>

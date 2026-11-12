@@ -26,7 +26,7 @@ return [
         'url'      => $env('APP_URL', 'http://192.168.0.1'),
         'debug'    => filter_var($env('APP_DEBUG', 'false'), FILTER_VALIDATE_BOOLEAN),
         'timezone' => $env('APP_TIMEZONE', 'America/Sao_Paulo'),
-        'versao'   => '2.0.30-dev',
+        'versao'   => '2.0.33-dev',
     ],
 
     'db' => [
@@ -39,7 +39,6 @@ return [
 
     'session' => [
         'nome'    => 'GWOS_SESSION',
-        'duracao' => 28800, // teto do cookie; a sessão administrativa expira antes por inatividade
     ],
 
     'sistema' => [

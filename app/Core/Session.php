@@ -11,11 +11,11 @@ class Session
         }
 
         $nome    = config('session.nome', 'GWOS_SESSION');
-        $duracao = (int) config('session.duracao', 7200);
 
         session_name($nome);
+        ini_set('session.use_strict_mode', '1');
         session_set_cookie_params([
-            'lifetime' => $duracao,
+            'lifetime' => 0,
             'path'     => '/',
             'secure'   => str_starts_with(config('app.url', ''), 'https'),
             'httponly' => true,

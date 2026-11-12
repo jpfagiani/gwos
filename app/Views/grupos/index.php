@@ -137,7 +137,7 @@ document.getElementById('formGrupo').addEventListener('submit', async e => {
         document.getElementById('erroGrupo').textContent = data.erro;
         document.getElementById('erroGrupo').classList.remove('d-none');
     } else {
-        location.reload();
+        recarregarPainel();
     }
 });
 
@@ -148,7 +148,7 @@ async function removerGrupo(id, nome) {
     fd.append('_method', 'DELETE');
     const res = await fetch('/grupos/' + id, { method: 'POST', body: fd });
     const data = await res.json();
-    if (data.erro) { alert(data.erro); } else { location.reload(); }
+    if (data.erro) { alert(data.erro); } else { recarregarPainel(); }
 }
 
 async function verIps(id, nome) {

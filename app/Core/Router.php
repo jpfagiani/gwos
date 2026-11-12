@@ -81,7 +81,7 @@ class Router
         $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
         $publicas = [
-            'GET /login', 'POST /login',
+            'GET /login', 'POST /login', 'POST /logout',
             'GET /acesso', 'POST /acesso', 'POST /acesso/sair', 'POST /acesso/agente', 'POST /acesso/monitor', 'POST /acesso/monitor/chave',
             'GET /acesso/cadastro', 'POST /acesso/cadastro',
             'GET /acesso/senha', 'POST /acesso/senha',
@@ -91,6 +91,7 @@ class Router
         $publica = in_array($metodo . ' ' . $caminho, $publicas, true);
 
         if (!$publica) {
+            header('Cache-Control: no-store, private');
             Auth::exigir();
         }
 

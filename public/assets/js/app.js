@@ -2,6 +2,61 @@
 
 const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
+// Encerra a sessão ao sair do painel, preservando a navegação interna.
+let navegandoNoPainel = false;
+function recarregarPainel() {
+    navegandoNoPainel = true;
+    window.location.reload();
+}
+
+if (CSRF && document.body.classList.contains('gw-admin')) {
+    const interna = url => {
+        const destino = new URL(url, window.location.href);
+        return destino.origin === window.location.origin &&
+            !/^\/(?:login|acesso)(?:\/|$)/.test(destino.pathname);
+    };
+
+    if (window.navigation) {
+        window.navigation.addEventListener('navigate', event => {
+            if (event.hashChange || event.destination.sameDocument || event.downloadRequest != null) return;
+            navegandoNoPainel = interna(event.destination.url);
+            event.signal.addEventListener('abort', () => { navegandoNoPainel = false; }, {once: true});
+        });
+    } else {
+        const marcarNavegacao = event => {
+            queueMicrotask(() => {
+                if (!event.defaultPrevented) navegandoNoPainel = true;
+            });
+        };
+        document.addEventListener('click', event => {
+            const link = event.target.closest('a[href]');
+            if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey ||
+                (link.target && link.target !== '_self') || link.hasAttribute('download') || !interna(link.href)) return;
+            const destino = new URL(link.href);
+            if (destino.pathname === location.pathname && destino.search === location.search && destino.hash) return;
+            marcarNavegacao(event);
+        });
+        document.addEventListener('submit', event => {
+            const form = event.target;
+            const target = event.submitter?.formTarget || form.target;
+            const action = event.submitter?.getAttribute('formaction') || form.action;
+            if ((!target || target === '_self') && interna(action)) marcarNavegacao(event);
+        });
+    }
+
+    window.addEventListener('pagehide', () => {
+        if (navegandoNoPainel) return;
+        const dados = new URLSearchParams({_csrf: CSRF, encerrar_janela: '1'});
+        if (!navigator.sendBeacon?.('/logout', dados)) {
+            fetch('/logout', {method: 'POST', body: dados, keepalive: true, credentials: 'same-origin'}).catch(() => {});
+        }
+    });
+    window.addEventListener('pageshow', event => {
+        navegandoNoPainel = false;
+        if (event.persisted) recarregarPainel();
+    });
+}
+
 // Barra lateral no desktop e menu sobreposto em telas estreitas.
 const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('btnSidebar');
@@ -130,7 +185,7 @@ document.addEventListener('submit', async e => {
             window.location.href = dados.redirecionar;
         } else if (dados.sucesso) {
             mostrarAlerta('success', dados.sucesso);
-            if (form.dataset.reload !== undefined) location.reload();
+            if (form.dataset.reload !== undefined) recarregarPainel();
         } else if (dados.erro) {
             mostrarAlerta('danger', dados.erro);
         }

@@ -7,7 +7,7 @@ $rot = ['ok' => ['OK', 'check-circle-fill'], 'warn' => ['Atenção', 'exclamatio
   <div class="col-lg-6"><div class="gw-card"><div class="gw-titulo"><span><i class="bi bi-clipboard2-pulse"></i><?= h($grupo) ?></span></div>
     <div class="gw-corpo sem-pad"><table class="gw-tabela"><tbody>
     <?php foreach ($itens as $c): [$t, $ic] = $rot[$c['estado']]; ?>
-      <tr><td style="width:38%"><?= h($c['nome']) ?></td><td><span class="st <?= $c['estado'] === 'ok' ? 'ok' : ($c['estado'] === 'bad' ? 'bad' : ($c['estado'] === 'warn' ? 'warn' : 'nd')) ?>"><i class="bi bi-<?= $ic ?>"></i><?= $t ?></span></td><td class="text-muted gw-detalhe"><?= h($c['detalhe']) ?></td></tr>
+      <tr<?php if ($grupo === 'Serviços'): ?> id="servico-<?= h($c['nome']) ?>" class="gw-servico-diagnostico"<?php endif; ?>><td style="width:38%"><?= h($c['nome']) ?></td><td><span class="st <?= $c['estado'] === 'ok' ? 'ok' : ($c['estado'] === 'bad' ? 'bad' : ($c['estado'] === 'warn' ? 'warn' : 'nd')) ?>"><i class="bi bi-<?= $ic ?>"></i><?= $t ?></span></td><td class="text-muted gw-detalhe"><?= h($c['detalhe']) ?></td></tr>
     <?php endforeach; ?></tbody></table></div></div></div>
 <?php endforeach; ?>
 </div>

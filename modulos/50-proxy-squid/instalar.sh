@@ -95,7 +95,7 @@ chmod 0640 /var/lib/gwos/sessions/sessoes.txt
     done
 }
 [ -f /etc/squid/conf.d/gwos_integracao.conf ] || \
-    printf '# Gerado por gwos-integrar.\ndns_nameservers 8.8.8.8 1.1.1.1\ndns_defnames off\n' \
+    printf '# Gerado por gwos-integrar.\ndns_nameservers %s\ndns_defnames off\n' "$DNS_FORWARDERS" \
         > /etc/squid/conf.d/gwos_integracao.conf
 
 # Portas — o gwos-integrar regrava no fim; aqui só o mínimo para o Squid

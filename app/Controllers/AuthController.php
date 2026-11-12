@@ -8,6 +8,7 @@ class AuthController extends Controller
 {
     public function formulario(): void
     {
+        header('Cache-Control: no-store, private');
         if (Auth::verificar()) {
             $this->redirect('/');
         }
@@ -42,6 +43,11 @@ class AuthController extends Controller
 
     public function sair(): never
     {
+        if (($_POST['encerrar_janela'] ?? '') === '1') {
+            Session::destruir();
+            http_response_code(204);
+            exit;
+        }
         Auth::logout();
     }
 }

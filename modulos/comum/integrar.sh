@@ -127,8 +127,8 @@ if tem_squid && [ -d /etc/squid ]; then
     else
         DNS_SQUID=$(awk '/^nameserver/{print $2}' /etc/resolv.conf 2>/dev/null \
                     | grep -v '^127\.' | head -2 | paste -sd ' ' -)
-        DNS_SQUID="${DNS_SQUID:-8.8.8.8 1.1.1.1}"
-        DNS_ORIGEM="resolvers externos (módulo 20-dns-bind9 ausente)"
+        DNS_SQUID="${DNS_SQUID:-$DNS_FORWARDERS}"
+        DNS_ORIGEM="resolvers do sistema ou do perfil (BIND9 local indisponível)"
     fi
 
     cat > /etc/squid/conf.d/gwos_integracao.conf <<SQINT
