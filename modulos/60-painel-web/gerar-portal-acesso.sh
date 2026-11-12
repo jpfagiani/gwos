@@ -86,7 +86,12 @@ trap 'rm -f "$TMP" "${EXT:-}" "${CSR:-}"' EXIT
 
 cat > "$TMP" <<NGINX
 # Gerado por gwos-gerar-portal-acesso — NÃO editar à mão.
-limit_req_zone \$binary_remote_addr zone=gwos_acesso:1m rate=30r/m;
+# Sondas do Firefox têm um orçamento separado do acesso normal e do login.
+map "\$request_method:\$arg_url" \$gwos_acesso_chave {
+    default \$binary_remote_addr;
+    ~*^GET:https?%3A%2F%2F(?:firefox-portal-detection[.]com|detectportal[.]firefox[.]com)%2Fsuccess[.]txt(?:%23ipv[46])?$ "sonda:\$remote_addr";
+}
+limit_req_zone \$gwos_acesso_chave zone=gwos_acesso_v2:1m rate=30r/m;
 
 server {
     listen ${PORTA} ssl;
@@ -109,7 +114,8 @@ server {
     location /assets/       { }
 
     location /acesso {
-        limit_req zone=gwos_acesso burst=20 nodelay;
+        limit_req zone=gwos_acesso_v2 burst=20 nodelay;
+        limit_req_status 429;
         include fastcgi_params;
         fastcgi_pass unix:${PHP_SOCK};
         fastcgi_param SCRIPT_FILENAME \$document_root/index.php;

@@ -2,7 +2,7 @@
 
 namespace App\Controllers;
 
-use App\Core\{Auth, Database, Controller, Auditoria};
+use App\Core\{Auth, Database, Controller, Auditoria, Session, Tarefas};
 
 class HorarioController extends Controller
 {
@@ -57,6 +57,47 @@ class HorarioController extends Controller
         Auditoria::registrar('criar_horario', 'horarios', (int)$id, null, compact('nome', 'hora_inicio', 'hora_fim') + ['tarefa_id' => $tarefa]);
 
         json_resposta(['sucesso' => 'Horário criado; aplicação enfileirada.', 'id' => $id, 'tarefa_id' => $tarefa]);
+    }
+
+    public function definirEstado(string $id): void
+    {
+        Auth::exigir();
+        if (!pode_editar() || !csrf_verificar()) {
+            http_response_code(403);
+            return;
+        }
+        $estado = $_POST['ativo'] ?? null;
+        if (!ctype_digit($id) || !in_array($estado, ['0', '1'], true)) {
+            Session::flash('erro', 'Estado do horário inválido.');
+            $this->redirect('/horarios');
+        }
+
+        $horario = Database::fetch('SELECT ativo FROM horarios WHERE id = ?', [$id]);
+        if (!$horario) {
+            Session::flash('erro', 'Horário não encontrado.');
+            $this->redirect('/horarios');
+        }
+        $novo = (int) $estado;
+        $anterior = (int) $horario['ativo'];
+        $alterado = Database::execute('UPDATE horarios SET ativo = ? WHERE id = ? AND ativo = ? AND ativo <> ?', [$novo, $id, $anterior, $novo]);
+        if (!$alterado && $anterior !== $novo) {
+            Session::flash('erro', 'O horário mudou em outra operação. Confira o estado atual.');
+            $this->redirect('/horarios');
+        }
+
+        try {
+            $tarefa = Tarefas::enfileirar('hours_squid', [], Auth::id(), 'hours_squid');
+        } catch (\RuntimeException $e) {
+            if ($alterado) {
+                Database::execute('UPDATE horarios SET ativo = ? WHERE id = ? AND ativo = ?', [$anterior, $id, $novo]);
+            }
+            Session::flash('erro', 'Não foi possível enfileirar a aplicação no Squid. Confira a fila de tarefas e tente novamente.');
+            $this->redirect('/horarios');
+        }
+
+        Auditoria::registrar('estado_horario', 'horarios', (int) $id, ['ativo' => $anterior], ['ativo' => $novo, 'tarefa_id' => $tarefa]);
+        Session::flash('sucesso', ($novo ? 'Horário ativado' : 'Horário desativado') . ' no painel. Aplicação no Squid enfileirada.');
+        $this->redirect('/horarios');
     }
 
     public function remover(string $id): void

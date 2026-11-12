@@ -1,4 +1,5 @@
 <?php $titulo = 'Horários'; $modulo = 'horarios';
+$podeEditarHorarios = pode_editar();
 $diasNomes = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 if (!function_exists('formatarDias')) {
 function formatarDias(string $dias): string {
@@ -14,15 +15,17 @@ function formatarDias(string $dias): string {
 }
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="page-head align-items-center">
     <h5 class="mb-0 fw-bold">Horários de Acesso</h5>
+    <?php if ($podeEditarHorarios): ?>
     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalHorario">
         <i class="bi bi-plus-lg me-1"></i>Novo Horário
     </button>
+    <?php endif; ?>
 </div>
 
 <div class="card border-0 shadow-sm">
-    <div class="table-responsive">
+    <div class="table-responsive" tabindex="0" role="region" aria-label="Horários de acesso">
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
@@ -31,12 +34,13 @@ function formatarDias(string $dias): string {
                     <th>Dias</th>
                     <th>Horário</th>
                     <th>Ação</th>
-                    <th class="text-end">Remover</th>
+                    <th>Estado</th>
+                    <?php if ($podeEditarHorarios): ?><th class="text-end">Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($horarios)): ?>
-                    <tr><td colspan="6" class="text-center text-muted py-3">Nenhum horário cadastrado.</td></tr>
+                    <tr><td colspan="<?= $podeEditarHorarios ? 7 : 6 ?>" class="text-center text-muted py-3">Nenhum horário cadastrado.</td></tr>
                 <?php else: ?>
                     <?php foreach ($horarios as $h): ?>
                         <tr>
@@ -51,12 +55,24 @@ function formatarDias(string $dias): string {
                                     <?= h(ucfirst($h['acao'])) ?>
                                 </span>
                             </td>
-                            <td class="text-end">
-                                <button class="btn btn-sm btn-outline-danger"
-                                        onclick="removerHorario(<?= $h['id'] ?>, '<?= h($h['nome']) ?>')">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                            <td><span class="badge bg-<?= $h['ativo'] ? 'success' : 'secondary' ?>"><?= $h['ativo'] ? 'Ativo' : 'Inativo' ?></span></td>
+                            <?php if ($podeEditarHorarios): ?>
+                            <td>
+                                <div class="d-flex flex-wrap justify-content-end gap-1">
+                                    <form method="post" action="/horarios/<?= (int) $h['id'] ?>/estado">
+                                        <?= csrf_field() ?>
+                                        <button class="btn btn-sm btn-outline-primary" type="submit" name="ativo" value="<?= $h['ativo'] ? '0' : '1' ?>">
+                                            <?= $h['ativo'] ? 'Desativar' : 'Ativar' ?>
+                                        </button>
+                                    </form>
+                                    <button class="btn btn-sm btn-outline-danger" type="button"
+                                            data-nome="<?= h($h['nome']) ?>" aria-label="Excluir <?= h($h['nome']) ?>"
+                                            onclick="removerHorario(<?= (int) $h['id'] ?>, this.dataset.nome)">
+                                        <i class="bi bi-trash" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                             </td>
+                            <?php endif; ?>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>

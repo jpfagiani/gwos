@@ -33,6 +33,7 @@ $router->post('/dominios/aplicar', 'DominioController@aplicar');
 
 $router->get('/horarios', 'HorarioController@index');
 $router->post('/horarios', 'HorarioController@criar');
+$router->post('/horarios/{id}/estado', 'HorarioController@definirEstado');
 $router->delete('/horarios/{id}', 'HorarioController@remover');
 
 $router->get('/nat', 'NatController@index');
