@@ -77,7 +77,7 @@ $estadoWan = $estado[0] === 'erro';
 <div class="gw-dashboard-analise">
   <div class="gw-dashboard-trafego">
     <div class="gw-card">
-      <div class="gw-titulo"><span><i class="bi bi-graph-up"></i>Tráfego da Internet (últimas 24h)</span><span class="small text-muted fw-normal"><span class="me-2"><i class="bi bi-circle-fill" style="color:#0866d9;font-size:.55rem"></i> Download</span><span><i class="bi bi-circle-fill" style="color:#f59e0b;font-size:.55rem"></i> Upload</span></span></div>
+      <div class="gw-titulo"><span><i class="bi bi-graph-up"></i>Tráfego da Internet (últimas 24h)</span><span class="small text-muted fw-normal"><span class="me-2"><i class="bi bi-circle-fill" style="color:#397862;font-size:.55rem"></i> Download</span><span><i class="bi bi-circle-fill" style="color:#f59e0b;font-size:.55rem"></i> Upload</span></span></div>
       <div class="gw-corpo gw-dashboard-grafico">
         <?php if ($hist24['amostras'] < 2): ?><div class="gw-vazio">Sem dados de interface no período. O coletor grava uma amostra por minuto (cron).</div><?php else: ?><canvas id="grafico24h" height="230"></canvas><?php endif; ?>
       </div>
@@ -218,7 +218,7 @@ $estadoWan = $estado[0] === 'erro';
     const cor = getComputedStyle(document.documentElement).getPropertyValue('--gw-muted') || '#64748b';
     const g24 = document.getElementById('grafico24h');
     if (g24 && window.Chart) new Chart(g24, {type:'line', data:{labels:hist.labels, datasets:[
-        {label:'Download', data:hist.rx.map(mbps), borderColor:'#0866d9', backgroundColor:'#0866d933', fill:true, tension:.35, pointRadius:0, borderWidth:2, spanGaps:false},
+        {label:'Download', data:hist.rx.map(mbps), borderColor:'#397862', backgroundColor:'#39786233', fill:true, tension:.35, pointRadius:0, borderWidth:2, spanGaps:false},
         {label:'Upload', data:hist.tx.map(mbps), borderColor:'#f59e0b', backgroundColor:'#f59e0b22', fill:true, tension:.35, pointRadius:0, borderWidth:2, spanGaps:false}]},
         options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c => c.dataset.label+': '+(c.parsed.y===null?'sem dados':c.parsed.y+' Mbps')}}},
         scales:{x:{ticks:{maxTicksLimit:7, color:cor}, grid:{display:false}}, y:{beginAtZero:true, ticks:{color:cor, callback:v=>v+' Mbps'}}}}});
@@ -229,7 +229,7 @@ $estadoWan = $estado[0] === 'erro';
             {data:Array(pts).fill(null), borderColor:c1, backgroundColor:c1+'55', fill:true, tension:.4, pointRadius:0, borderWidth:1.5},
             {data:Array(pts).fill(null), borderColor:c2, backgroundColor:c2+'33', fill:true, tension:.4, pointRadius:0, borderWidth:1.5}]},
             options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{enabled:false}}, scales:{x:{display:false}, y:{display:false, min:0}}}}); }
-    const sW = spark('sparkWan', '#0866d9', '#b45309'), sL = spark('sparkLan', '#15803d', '#0891b2');
+    const sW = spark('sparkWan', '#397862', '#b45309'), sL = spark('sparkLan', '#15803d', '#75654d');
     const fmt = b => b >= 1e9 ? (b/1e9).toFixed(2)+' Gbps' : b >= 1e6 ? (b/1e6).toFixed(1)+' Mbps' : b >= 1e3 ? (b/1e3).toFixed(0)+' Kbps' : Math.round(b)+' bps';
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const bytes = n => { n = Number(n)||0; if (n < 1024) return n+' B'; const u=['KB','MB','GB','TB']; let i=-1; do { n/=1024; i++; } while (n>=1024 && i<3); return n.toFixed(1)+' '+u[i]; };

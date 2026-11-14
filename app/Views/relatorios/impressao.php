@@ -36,25 +36,25 @@ $tabela = static function (string $titulo, array $colunas, array $linhas, callab
     <meta name="robots" content="noindex">
     <title>GWOS — Relatório de acessos e operações</title>
     <style>
-        :root { font: 15px/1.45 system-ui, sans-serif; color: #152238; background: #edf2f7; }
+        :root { font: 15px/1.45 system-ui, sans-serif; color: #22312b; background: #f7f3eb; }
         body { margin: 0; }
         main { max-width: 1100px; margin: 1.5rem auto; padding: clamp(1rem, 4vw, 2rem); background: white; }
         nav { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
-        a { color: #174f9c; }
-        button { font: inherit; color: white; background: #174f9c; border: 0; border-radius: 8px; padding: .6rem 1rem; cursor: pointer; }
-        header { border-bottom: 2px solid #174f9c; padding-bottom: .8rem; }
+        a { color: #194b3e; }
+        button { font: inherit; color: white; background: #194b3e; border: 0; border-radius: 8px; padding: .6rem 1rem; cursor: pointer; }
+        header { border-bottom: 2px solid #194b3e; padding-bottom: .8rem; }
         h1, h2, p { margin: 0 0 .5rem; }
         h1 { font-size: clamp(1.45rem, 3vw, 2rem); }
         h2 { font-size: 1.15rem; }
         section { margin-top: 1.25rem; }
-        .nota { color: #44566d; }
+        .nota { color: #4b5b50; }
         dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .65rem; }
-        dl div { padding: .65rem; border: 1px solid #cad5e2; border-radius: 8px; }
+        dl div { padding: .65rem; border: 1px solid #c7cec1; border-radius: 8px; }
         dd { margin: 0; font-weight: 700; font-size: 1.1rem; }
         .tabela { overflow-x: auto; }
         table { border-collapse: collapse; width: 100%; font-size: .88rem; }
-        th, td { border-bottom: 1px solid #cad5e2; padding: .45rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
-        th { background: #edf2f7; }
+        th, td { border-bottom: 1px solid #c7cec1; padding: .45rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+        th { background: #f7f3eb; }
         @page { size: A4 landscape; margin: 12mm; }
         @media print {
             :root { background: white; font-size: 10pt; }

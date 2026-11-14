@@ -1,6 +1,6 @@
 # GWOS — documentação consolidada
 
-Pacote GWOS 2.0.52-dev. As seções de diagnóstico e histórico registram o estado das revisões citadas. Consulte os testes para verificar a evidência disponível nesta versão.
+Pacote GWOS 2.0.53-dev. As seções de diagnóstico e histórico registram o estado das revisões citadas. Consulte os testes para verificar a evidência disponível nesta versão.
 
 ## Índice
 
@@ -201,7 +201,7 @@ Anexe o ZIP à VM por ISO, pasta compartilhada ou SCP. No Debian, como `root`:
 ```bash
 apt update
 apt install -y unzip
-unzip -q /caminho/GWOS-v2.0.52-dev-relatorio.zip -d /opt
+unzip -q /caminho/GWOS-v2.0.53-dev-paleta.zip -d /opt
 cd /opt/gwos
 ```
 
@@ -306,10 +306,10 @@ Faça primeiro em uma VM de laboratório (ou com snapshot) e mantenha acesso ao 
    cp -a /opt/gwos /root/gwos-antes-v2.0.0
    ```
    Se for VM, tire também um snapshot.
-2. **Enviar o pacote** `GWOS-v2.0.52-dev-relatorio.zip` para o servidor (scp, WinSCP ou pen drive) e extrair em uma pasta temporária:
+2. **Enviar o pacote** `GWOS-v2.0.53-dev-paleta.zip` para o servidor (scp, WinSCP ou pen drive) e extrair em uma pasta temporária:
    ```
    apt-get install -y unzip
-   mkdir /root/gwos-novo && unzip GWOS-v2.0.52-dev-relatorio.zip -d /root/gwos-novo
+   mkdir /root/gwos-novo && unzip GWOS-v2.0.53-dev-paleta.zip -d /root/gwos-novo
    ```
 3. **Copiar o código novo por cima, preservando a configuração** (`.env` e `storage/` não são sobrescritos):
    ```
